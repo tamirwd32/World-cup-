@@ -49,16 +49,38 @@ export async function POST() {
     });
 
     const data = await res.json();
-    if (!res.ok) return Response.json({ error: data?.error?.message || "Gemini " + res.status }, { status: 502 });
+
+    // Specific handling for rate limit (429)
+    if (res.status === 429) {
+      return Response.json({ error: "המכסה היומית של Gemini נוצלה. נסו שוב בעוד כמה דקות.", rateLimited: true }, { status: 429 });
+    }
+
+    if (!res.ok) {
+      return Response.json({ error: data?.error?.message || ("Gemini error " + res.status) }, { status: 502 });
+    }
 
     const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
     const clean = text.replace(/```json|```/g, "").trim();
 
     let parsed;
-    try { parsed = JSON.parse(clean); }
-    catch {
+    try {
+      parsed = JSON.parse(clean);
+    } catch {
       const m = clean.match(/\{[\s\S]*\}/);
-      parsed = m ? JSON.parse(m[0]) : JSON.parse(PROMPT.match(/\{[\s\S]*\}/)[0]);
+      if (!m) {
+        // Do NOT fall back to the prompt template — return a clear error
+        return Response.json({ error: "Gemini החזיר תשובה לא תקינה. נסו שוב." }, { status: 502 });
+      }
+      try {
+        parsed = JSON.parse(m[0]);
+      } catch {
+        return Response.json({ error: "Gemini החזיר JSON שבור. נסו שוב." }, { status: 502 });
+      }
+    }
+
+    // Validate the response has the expected shape
+    if (!parsed.standings || !Array.isArray(parsed.standings)) {
+      return Response.json({ error: "תשובת Gemini חסרה נתונים. נסו שוב." }, { status: 502 });
     }
 
     return Response.json(parsed, { headers: { "Cache-Control": "no-store" } });

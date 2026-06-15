@@ -61,6 +61,9 @@ const styles = `
   .bet-pick { font-size:16px; font-weight:700; color:var(--gold); margin-bottom:4px; }
   .bet-reason { font-size:12px; color:var(--muted); line-height:1.5; }
   .bet-odds { display:inline-block; margin-top:6px; font-family:var(--font-mono); font-size:12px; color:var(--blue); }
+  .load-more-btn { width:100%; margin-top:14px; padding:12px; background:var(--surface2); border:1px dashed var(--border); border-radius:8px; color:var(--gold); font-family:var(--font-body); font-size:13px; font-weight:600; cursor:pointer; transition:all .2s; }
+  .load-more-btn:hover:not(:disabled) { background:var(--border); }
+  .load-more-btn:disabled { opacity:.45; cursor:not-allowed; }
   .bet-disclaimer { font-size:11px; color:var(--muted); text-align:center; padding:12px; border-top:1px solid var(--border); margin-top:14px; font-style:italic; }
   .results-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:10px; }
   .result-item { background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:10px 12px; }
@@ -88,10 +91,14 @@ const SEED = {
     { group:"H", home:"ספרד", score:"0–0", away:"קייפ ורדה", note:"⚠️ הפתעה" },
     { group:"G", home:"בלגיה", score:"0–1", away:"מצרים", note:"⚠️" },
     { group:"D", home:"ארה\"ב", score:"4–1", away:"פרגוואי", note:"" },
+    { group:"C", home:"ברזיל", score:"1–1", away:"מרוקו", note:"ויניסיוס הציל" },
+    { group:"F", home:"הולנד", score:"2–2", away:"יפן", note:"תיקו דרמטי" },
   ],
   bets: [
-    { match:"צרפת – סנגל", datetime:"שלישי 16.6, 22:00", pick:"צרפת מנצחת 2:0", confidence:"high", odds:"~2.10", reason:"הסגל העמוק ביותר, מבאפה ואוליז חדים מול הגנת סנגל" },
-    { match:"אנגליה – קרואטיה", datetime:"רביעי 17.6, 23:00", pick:"אנגליה מנצחת 2:1", confidence:"medium", odds:"~3.40", reason:"קיין בשיאו, קרואטיה מזדקנת אבל עדיין מסוכנת" },
+    { match:"צרפת – סנגל", datetime:"שלישי 16.6 בשעה 22:00", pick:"צרפת מנצחת 2:0", confidence:"high", odds:"~2.10", reason:"הסגל העמוק ביותר, מבאפה ואוליז חדים מול הגנת סנגל" },
+    { match:"אנגליה – קרואטיה", datetime:"רביעי 17.6 בשעה 23:00", pick:"אנגליה מנצחת 2:1", confidence:"medium", odds:"~3.40", reason:"קיין בשיאו, קרואטיה מזדקנת אבל מסוכנת" },
+    { match:"ארגנטינה – אלג׳יריה", datetime:"שני 22.6 בשעה 20:00", pick:"ארגנטינה מנצחת 3:0", confidence:"high", odds:"~1.45", reason:"בית קל, ניסיון עצום של הסגל" },
+    { match:"גרמניה – חוף השנהב", datetime:"שישי 20.6 בשעה 22:00", pick:"גרמניה מנצחת 2:1", confidence:"medium", odds:"~2.80", reason:"גרמניה חזקה אך חוף השנהב מסוכן בנגד-התקפה" },
   ],
   analysis: "עדכון יום 5: ספרד 0:0 עם קייפ ורדה (הפתעה), בלגיה 0:1 מצרים, גרמניה 7:1 מרשים. נבחרות עם עומק שורדות. צרפת המועמדת הראשית."
 };
@@ -100,6 +107,7 @@ export default function Page() {
   const [tab, setTab] = useState("standings");
   const [data, setData] = useState(SEED);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(null);
 
   const refresh = useCallback(async () => {
@@ -115,6 +123,25 @@ export default function Page() {
       setLoading(false);
     }
   }, []);
+
+  const loadMoreBets = useCallback(async () => {
+    setLoadingMore(true);
+    try {
+      const res = await fetch("/api/analyze", { method: "POST" });
+      const fresh = await res.json();
+      if (fresh.error || !fresh.bets) throw new Error("no bets");
+      const existingMatches = new Set((data.bets || []).map(b => b.match));
+      const newBets = fresh.bets.filter(b => !existingMatches.has(b.match));
+      const merged = newBets.length > 0
+        ? [...(data.bets || []), ...newBets]
+        : [...(data.bets || []), ...fresh.bets];
+      setData(prev => ({ ...prev, bets: merged }));
+    } catch {
+      // silent fail
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [data.bets]);
 
   useEffect(() => {
     refresh();
@@ -211,6 +238,9 @@ export default function Page() {
                 </div>
               ))}
             </div>
+            <button className="load-more-btn" onClick={loadMoreBets} disabled={loadingMore}>
+              {loadingMore ? "⏳ טוען המלצות נוספות..." : "➕ טען עוד המלצות"}
+            </button>
             <div className="bet-disclaimer">⚠️ להנאה בין חברים בלבד · לא ייעוץ פיננסי · אין להמר כסף אמיתי</div>
           </div>
         )}

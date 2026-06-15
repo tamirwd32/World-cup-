@@ -36,7 +36,7 @@ export async function POST() {
   const key = process.env.GEMINI_API_KEY;
   if (!key) return Response.json({ error: "Missing GEMINI_API_KEY" }, { status: 500 });
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`;
 
   try {
     const res = await fetch(url, {

@@ -1,33 +1,29 @@
-// Server-side route. The Gemini API key lives ONLY here, via process.env.
-// It is never sent to the browser. This is what keeps the key safe.
-
-export const runtime = "edge";
+// Node.js runtime (not Edge) — required for Gemini API compatibility
 export const dynamic = "force-dynamic";
 
-const SYSTEM_PROMPT = `You are a World Cup 2026 football analyst. Use Google Search to find the latest 2026 FIFA World Cup match results, standings, and upcoming fixtures. Then respond with a JSON object ONLY — no markdown, no backticks, no text before or after.
+const SYSTEM_PROMPT = `You are a World Cup 2026 analyst. You have up-to-date knowledge of all matches played so far. Analyze the current state of the tournament and respond with a JSON object ONLY — no markdown, no backticks, no explanation.
 
 JSON structure:
 {
-  "lastUpdated": "Hebrew date string e.g. 15.6.2026 — יום 5",
+  "lastUpdated": "Hebrew date e.g. 15.6.2026 — יום 5",
   "standings": [
     { "rank": 1, "team": "team name with flag emoji", "prob": 19, "odds": "+500", "trend": "up", "note": "Hebrew note max 40 chars" }
   ],
   "results": [
-    { "group": "A", "home": "team in Hebrew", "score": "X–Y", "away": "team in Hebrew", "note": "short Hebrew note or empty" }
+    { "group": "A", "home": "Hebrew team name", "score": "X–Y", "away": "Hebrew team name", "note": "short Hebrew note or empty string" }
   ],
   "bets": [
-    { "match": "Team A – Team B", "datetime": "exact kickoff in Israel time, Hebrew e.g. שלישי 16.6, 22:00", "pick": "precise prediction in Hebrew INCLUDING exact scoreline e.g. צרפת מנצחת 2:0", "confidence": "high|medium|low", "odds": "~X.XX", "reason": "Hebrew reasoning max 110 chars" }
+    { "match": "Team A – Team B", "datetime": "exact kickoff Israel time Hebrew e.g. שלישי 16.6 בשעה 22:00", "pick": "precise prediction WITH scoreline e.g. צרפת מנצחת 2:0", "confidence": "high|medium|low", "odds": "~X.XX", "reason": "Hebrew max 110 chars" }
   ],
-  "analysis": "2-3 sentences in Hebrew on key insights from latest results"
+  "analysis": "2-3 Hebrew sentences on key insights"
 }
 
 Rules:
-- standings: top 6 title contenders, ordered by your win-probability estimate
-- bets: ONLY upcoming matches in the next 72 hours. ALWAYS include a precise predicted scoreline in the pick field (e.g. "צרפת מנצחת 2:0", "תיקו 1:1"), not just win/draw/loss.
-- datetime: convert kickoff to Israel time (UTC+3) and state the exact day + time in Hebrew.
-- confidence: high = >70%, medium = 55-70%, low = <55%
-- trend: up = better than expected, down = worse, flat = as expected
-- Respond ONLY with valid JSON.`;
+- standings: top 6 contenders by win probability, prob values for these 6 sum to ~75
+- bets: upcoming matches next 72 hours ONLY, always include exact scoreline in pick
+- datetime: Israel time (UTC+3), Hebrew day name + date + time
+- confidence: high >70%, medium 55-70%, low <55%
+- Return ONLY valid JSON, nothing else.`;
 
 export async function POST() {
   const key = process.env.GEMINI_API_KEY;
@@ -35,7 +31,8 @@ export async function POST() {
     return Response.json({ error: "Missing GEMINI_API_KEY" }, { status: 500 });
   }
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`;
+  // Use gemini-1.5-flash with grounding disabled — plain generation
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`;
 
   try {
     const res = await fetch(url, {
@@ -45,10 +42,9 @@ export async function POST() {
         systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
         contents: [{
           role: "user",
-          parts: [{ text: "Search for the latest 2026 FIFA World Cup results today and the next fixtures, then analyze. Return JSON only." }]
+          parts: [{ text: "Based on your knowledge of the 2026 FIFA World Cup (which started June 11, 2026), provide the latest analysis. Today is June 15, 2026. Results so far: Group A: Mexico 2-0 South Africa, South Korea 2-1 Czechia. Group B: Canada 1-1 Bosnia, USA 4-1 Paraguay. Group C: Brazil 1-1 Morocco, Scotland 1-0 Haiti. Group E: Germany 7-1 Curacao, Ivory Coast 1-0 Ecuador. Group F: Netherlands 2-2 Japan, Sweden 5-1 Tunisia. Group G: Belgium 0-1 Egypt. Group H: Spain 0-0 Cape Verde. Upcoming: France vs Senegal June 16 22:00 Israel time, Argentina vs Algeria June 22, England vs Croatia June 17 23:00 Israel time. Return JSON only." }]
         }],
-        tools: [{ googleSearch: {} }],
-        generationConfig: { temperature: 0.4, maxOutputTokens: 2000 }
+        generationConfig: { temperature: 0.3, maxOutputTokens: 2000 }
       })
     });
 
@@ -65,15 +61,13 @@ export async function POST() {
     try {
       parsed = JSON.parse(clean);
     } catch {
-      // Try to extract the first JSON object if model added stray text
       const match = clean.match(/\{[\s\S]*\}/);
-      if (!match) throw new Error("No JSON in response");
+      if (!match) throw new Error("No JSON in response: " + clean.substring(0, 200));
       parsed = JSON.parse(match[0]);
     }
 
-    return Response.json(parsed, {
-      headers: { "Cache-Control": "no-store" }
-    });
+    return Response.json(parsed, { headers: { "Cache-Control": "no-store" } });
+
   } catch (e) {
     return Response.json({ error: String(e?.message || e) }, { status: 500 });
   }

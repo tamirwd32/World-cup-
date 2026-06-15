@@ -115,7 +115,11 @@ export default function Page() {
     try {
       const res = await fetch("/api/analyze", { method: "POST" });
       const fresh = await res.json();
-      if (fresh.error) throw new Error(fresh.error);
+      if (fresh.error) {
+        // Show the server's specific message (e.g. rate limit) instead of a generic one
+        setError(fresh.error + " מוצגים הנתונים האחרונים.");
+        return;
+      }
       setData(fresh);
     } catch {
       setError("לא הצלחתי לטעון נתונים עדכניים. מוצגים הנתונים האחרונים.");

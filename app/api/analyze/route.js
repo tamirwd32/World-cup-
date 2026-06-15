@@ -3,7 +3,7 @@ export const maxDuration = 60;
 
 const PROMPT = `You are a World Cup 2026 analyst. Today is June 16 2026, group stage matchday 2. Known results: Mexico 2-0 South Africa, South Korea 2-1 Czechia, Canada 1-1 Bosnia, USA 4-1 Paraguay, Brazil 1-1 Morocco, Scotland 1-0 Haiti, Germany 7-1 Curacao, Ivory Coast 1-0 Ecuador, Netherlands 2-2 Japan, Sweden 5-1 Tunisia, Belgium 0-1 Egypt, Spain 0-0 Cape Verde. Upcoming: France vs Senegal today 22:00 Israel, Iraq vs Norway today 21:00 Israel, England vs Croatia tomorrow 23:00 Israel, Portugal vs DR Congo tomorrow 20:00 Israel.
 
-Return ONLY a JSON object, no markdown:
+Return ONLY a JSON object, no markdown, no explanation:
 {
   "lastUpdated": "16.6.2026 — יום 6",
   "currentStage": "שלב הבתים",
@@ -19,7 +19,7 @@ Return ONLY a JSON object, no markdown:
     {"group":"E","home":"גרמניה","score":"7-1","away":"קוראסאו","note":"xG 3.91"},
     {"group":"H","home":"ספרד","score":"0-0","away":"קייפ ורדה","note":"הפתעה"},
     {"group":"G","home":"בלגיה","score":"0-1","away":"מצרים","note":""},
-    {"group":"D","home":"ארהב","score":"4-1","away":"פרגוואי","note":""},
+    {"group":"D","home":"ארה\"ב","score":"4-1","away":"פרגוואי","note":""},
     {"group":"C","home":"ברזיל","score":"1-1","away":"מרוקו","note":"ויניסיוס הציל"},
     {"group":"F","home":"הולנד","score":"2-2","away":"יפן","note":"דרמטי"}
   ],
@@ -32,59 +32,91 @@ Return ONLY a JSON object, no markdown:
   "analysis": "ספרד 0:0 עם קייפ ורדה — דפוס מדאיג חוזר. גרמניה 7:1 מרשים. צרפת המועמדת הראשית לפני יום 6."
 }`;
 
-export async function POST() {
-  const key = process.env.GEMINI_API_KEY;
-  if (!key) return Response.json({ error: "Missing GEMINI_API_KEY" }, { status: 500 });
-
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`;
-
-  try {
-    const res = await fetch(url, {
+async function callGemini(key) {
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`,
+    {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         contents: [{ role: "user", parts: [{ text: PROMPT }] }],
         generationConfig: { temperature: 0.2, maxOutputTokens: 2000 }
       })
-    });
-
-    const data = await res.json();
-
-    // Specific handling for rate limit (429)
-    if (res.status === 429) {
-      return Response.json({ error: "המכסה היומית של Gemini נוצלה. נסו שוב בעוד כמה דקות.", rateLimited: true }, { status: 429 });
     }
+  );
+  const data = await res.json();
+  if (res.status === 429) throw { code: 429, provider: "gemini" };
+  if (!res.ok) throw new Error("Gemini " + res.status + ": " + (data?.error?.message || ""));
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+  return text;
+}
 
-    if (!res.ok) {
-      return Response.json({ error: data?.error?.message || ("Gemini error " + res.status) }, { status: 502 });
-    }
+async function callGroq(key) {
+  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${key}`
+    },
+    body: JSON.stringify({
+      model: "llama-3.1-8b-instant",
+      messages: [{ role: "user", content: PROMPT }],
+      temperature: 0.2,
+      max_tokens: 2000
+    })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error("Groq " + res.status + ": " + (data?.error?.message || ""));
+  return data?.choices?.[0]?.message?.content || "";
+}
 
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-    const clean = text.replace(/```json|```/g, "").trim();
-
-    let parsed;
-    try {
-      parsed = JSON.parse(clean);
-    } catch {
-      const m = clean.match(/\{[\s\S]*\}/);
-      if (!m) {
-        // Do NOT fall back to the prompt template — return a clear error
-        return Response.json({ error: "Gemini החזיר תשובה לא תקינה. נסו שוב." }, { status: 502 });
-      }
-      try {
-        parsed = JSON.parse(m[0]);
-      } catch {
-        return Response.json({ error: "Gemini החזיר JSON שבור. נסו שוב." }, { status: 502 });
-      }
-    }
-
-    // Validate the response has the expected shape
-    if (!parsed.standings || !Array.isArray(parsed.standings)) {
-      return Response.json({ error: "תשובת Gemini חסרה נתונים. נסו שוב." }, { status: 502 });
-    }
-
-    return Response.json(parsed, { headers: { "Cache-Control": "no-store" } });
-  } catch(e) {
-    return Response.json({ error: String(e?.message || e) }, { status: 500 });
+function parseResponse(text) {
+  const clean = text.replace(/```json|```/g, "").trim();
+  let parsed;
+  try { parsed = JSON.parse(clean); }
+  catch {
+    const m = clean.match(/\{[\s\S]*\}/);
+    if (!m) throw new Error("No JSON in response");
+    parsed = JSON.parse(m[0]);
   }
+  if (!parsed.standings || !Array.isArray(parsed.standings)) {
+    throw new Error("Invalid response shape");
+  }
+  return parsed;
+}
+
+export async function POST() {
+  const geminiKey = process.env.GEMINI_API_KEY;
+  const groqKey = process.env.GROQ_API_KEY;
+
+  if (!geminiKey && !groqKey) {
+    return Response.json({ error: "Missing API keys" }, { status: 500 });
+  }
+
+  // Try Gemini first
+  if (geminiKey) {
+    try {
+      const text = await callGemini(geminiKey);
+      const parsed = parseResponse(text);
+      return Response.json({ ...parsed, provider: "gemini" }, { headers: { "Cache-Control": "no-store" } });
+    } catch(e) {
+      if (e.code !== 429 && !groqKey) {
+        return Response.json({ error: String(e?.message || e) }, { status: 502 });
+      }
+      // 429 or other error — fall through to Groq
+    }
+  }
+
+  // Fallback: Groq
+  if (groqKey) {
+    try {
+      const text = await callGroq(groqKey);
+      const parsed = parseResponse(text);
+      return Response.json({ ...parsed, provider: "groq" }, { headers: { "Cache-Control": "no-store" } });
+    } catch(e) {
+      return Response.json({ error: "כל ספקי ה-AI אינם זמינים כרגע. נסו שוב בעוד מספר דקות." }, { status: 502 });
+    }
+  }
+
+  return Response.json({ error: "המכסה היומית של Gemini נוצלה ואין ספק חלופי מוגדר." }, { status: 429 });
 }

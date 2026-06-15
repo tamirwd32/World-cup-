@@ -224,6 +224,12 @@ export default function Page() {
         {tab === "bets" && (
           <div className="card">
             <div className="card-title">🎯 המלצות הימורים — משחקים קרובים</div>
+            {data.currentStage && (
+              <div style={{display:"inline-flex",alignItems:"center",gap:6,padding:"4px 12px",background:"rgba(240,180,41,.12)",border:"1px solid rgba(240,180,41,.3)",borderRadius:6,marginBottom:14}}>
+                <span style={{fontSize:11,color:"var(--gold)",fontFamily:"var(--font-mono)",letterSpacing:2}}>שלב נוכחי:</span>
+                <span style={{fontSize:13,fontWeight:700,color:"var(--text)"}}>{data.currentStage}</span>
+              </div>
+            )}
             <div className="bet-list">
               {data.bets?.map((b,i) => (
                 <div key={i} className="bet-item">

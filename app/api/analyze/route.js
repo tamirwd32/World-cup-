@@ -1,5 +1,6 @@
-// Node.js runtime
+// Node.js runtime — max 60s for Gemini API calls
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 const SYSTEM_PROMPT = `You are a World Cup 2026 analyst. Respond with a JSON object ONLY — no markdown, no backticks, no explanation.
 
@@ -14,18 +15,18 @@ JSON structure:
     { "group": "A", "home": "Hebrew", "score": "X-Y", "away": "Hebrew", "note": "" }
   ],
   "bets": [
-    { "match": "Team A - Team B", "datetime": "Hebrew day + date + Israel time e.g. שלישי 16.6 בשעה 22:00", "pick": "prediction WITH exact scoreline e.g. צרפת מנצחת 2:0", "confidence": "high|medium|low", "odds": "~X.XX", "reason": "Hebrew max 110 chars" }
+    { "match": "Team A - Team B", "datetime": "Hebrew day + date + exact Israel time e.g. שלישי 16.6 בשעה 22:00", "pick": "prediction WITH exact scoreline e.g. צרפת מנצחת 2:0", "confidence": "high|medium|low", "odds": "~X.XX", "reason": "Hebrew max 110 chars" }
   ],
   "analysis": "2-3 Hebrew sentences"
 }
 
 CRITICAL RULES:
-- bets: include ALL matches in the next 24 hours. Do not limit to 2 or 4. If there are 8 matches today, include all 8.
-- Each bet must have an exact scoreline in the pick field (never just win/draw/loss).
+- bets: include ALL matches in the next 24 hours. Do not limit. If there are 8 matches, include all 8.
+- Each bet must have an exact scoreline in the pick field.
 - datetime: convert to Israel time (UTC+3), Hebrew day name.
-- currentStage: the current tournament stage in Hebrew (שלב הבתים during group stage).
+- currentStage: current tournament stage in Hebrew.
 - standings: top 6 by win probability.
-- Return ONLY valid JSON.`;
+- Return ONLY valid JSON, nothing else.`;
 
 export async function POST() {
   const key = process.env.GEMINI_API_KEY;
@@ -37,18 +38,19 @@ export async function POST() {
     const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      signal: AbortSignal.timeout(55000),
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
         contents: [{
           role: "user",
-          parts: [{ text: "2026 FIFA World Cup analysis. Today is June 16, 2026. We are in the group stage (Matchday 2 starts today). Results so far — Group A: Mexico 2-0 South Africa, South Korea 2-1 Czechia. Group B: Canada 1-1 Bosnia, USA 4-1 Paraguay. Group C: Brazil 1-1 Morocco, Scotland 1-0 Haiti. Group E: Germany 7-1 Curacao, Ivory Coast 1-0 Ecuador. Group F: Netherlands 2-2 Japan, Sweden 5-1 Tunisia. Group G: Belgium 0-1 Egypt, Iran vs New Zealand played. Group H: Spain 0-0 Cape Verde, Saudi Arabia vs Uruguay played. Group I: France vs Senegal TODAY 22:00 Israel time, Iraq vs Norway TODAY 21:00 Israel time. Group J: Argentina vs Algeria TODAY 02:00 Israel time (June 17 technically), Austria vs Jordan TODAY 05:00 Israel time. List ALL of today and tomorrow matches with exact Israel kickoff times. Provide full analysis and ALL bets for next 24 hours. Return JSON only." }]
+          parts: [{ text: "2026 FIFA World Cup. Today is June 16, 2026. Group stage matchday 2. Results so far: Mexico 2-0 South Africa, South Korea 2-1 Czechia, Canada 1-1 Bosnia, USA 4-1 Paraguay, Brazil 1-1 Morocco, Scotland 1-0 Haiti, Germany 7-1 Curacao, Ivory Coast 1-0 Ecuador, Netherlands 2-2 Japan, Sweden 5-1 Tunisia, Belgium 0-1 Egypt, Spain 0-0 Cape Verde. Upcoming today (June 16): France vs Senegal 22:00 Israel, Iraq vs Norway 21:00 Israel. Tomorrow (June 17): England vs Croatia 23:00 Israel, Portugal vs DR Congo 20:00 Israel. Provide complete JSON analysis with ALL upcoming bets." }]
         }],
-        generationConfig: { temperature: 0.3, maxOutputTokens: 3000 }
+        generationConfig: { temperature: 0.3, maxOutputTokens: 2500 }
       })
     });
 
     const data = await res.json();
-    if (!res.ok) return Response.json({ error: data?.error?.message || "Gemini error" }, { status: 502 });
+    if (!res.ok) return Response.json({ error: data?.error?.message || "Gemini API error: " + res.status }, { status: 502 });
 
     const text = data?.candidates?.[0]?.content?.parts?.map(p => p.text).join("") || "";
     const clean = text.replace(/```json|```/g, "").trim();
@@ -57,12 +59,12 @@ export async function POST() {
     try { parsed = JSON.parse(clean); }
     catch {
       const match = clean.match(/\{[\s\S]*\}/);
-      if (!match) throw new Error("No JSON: " + clean.substring(0, 200));
+      if (!match) throw new Error("No JSON found in: " + clean.substring(0, 300));
       parsed = JSON.parse(match[0]);
     }
 
     return Response.json(parsed, { headers: { "Cache-Control": "no-store" } });
   } catch(e) {
-    return Response.json({ error: String(e?.message || e) }, { status: 500 });
+    return Response.json({ error: e?.message || String(e) }, { status: 500 });
   }
 }

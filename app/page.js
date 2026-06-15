@@ -148,8 +148,9 @@ export default function Page() {
   }, [data.bets]);
 
   useEffect(() => {
-    refresh();
-    const id = setInterval(refresh, 30 * 60 * 1000);
+    // No auto-call on load — preserves API quota
+    // Auto-refresh every 60 min (not 30) to reduce API calls
+    const id = setInterval(refresh, 60 * 60 * 1000);
     return () => clearInterval(id);
   }, [refresh]);
 

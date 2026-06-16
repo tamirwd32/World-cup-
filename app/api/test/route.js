@@ -1,40 +1,28 @@
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const key = process.env.FOOTBALL_API_KEY;
-  if (!key) return Response.json({ error: "No FOOTBALL_API_KEY" });
-
-  const BASE = "https://v3.football.api-sports.io";
-  const headers = { "x-apisports-key": key };
+  const key = process.env.FOOTBALL_DATA_KEY;
+  if (!key) return Response.json({ error: "No FOOTBALL_DATA_KEY" });
 
   try {
-    // First check what leagues are available for 2026
-    const leaguesRes = await fetch(`${BASE}/leagues?season=2026&type=Cup`, { headers });
-    const leaguesData = await leaguesRes.json();
-
-    const leagues = (leaguesData.response || []).slice(0, 10).map(l => ({
-      id: l.league.id,
-      name: l.league.name,
-      country: l.country.name
-    }));
-
-    // Also try fixtures for league 1 (World Cup)
-    const fixRes = await fetch(`${BASE}/fixtures?league=1&season=2026&last=5`, { headers });
-    const fixData = await fixRes.json();
+    const res = await fetch("https://api.football-data.org/v4/competitions/WC/matches?season=2026", {
+      headers: { "X-Auth-Token": key }
+    });
+    const data = await res.json();
 
     return Response.json({
-      football_api_status: leaguesRes.status,
-      leagues_found: leagues,
-      fixtures_status: fixRes.status,
-      fixtures_count: fixData.response?.length || 0,
-      fixtures_sample: (fixData.response || []).slice(0,2).map(f => ({
-        date: f.fixture.date,
-        home: f.teams.home.name,
-        away: f.teams.away.name,
-        score: `${f.goals.home}-${f.goals.away}`,
-        status: f.fixture.status.short
-      })),
-      fixtures_errors: fixData.errors
+      status: res.status,
+      ok: res.ok,
+      error: data.message || null,
+      total_matches: data.matches?.length || 0,
+      finished: data.matches?.filter(m => m.status === "FINISHED").length || 0,
+      upcoming: data.matches?.filter(m => m.status === "TIMED" || m.status === "SCHEDULED").length || 0,
+      sample: (data.matches || []).filter(m => m.status === "FINISHED").slice(0,3).map(m => ({
+        date: m.utcDate,
+        home: m.homeTeam.shortName,
+        away: m.awayTeam.shortName,
+        score: `${m.score.fullTime.home}-${m.score.fullTime.away}`
+      }))
     });
   } catch(e) {
     return Response.json({ error: e.message });

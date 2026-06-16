@@ -2,22 +2,20 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   const key = process.env.FOOTBALL_DATA_KEY;
-  if (!key) return Response.json({ error: "No key" });
-
-  const res = await fetch("https://api.football-data.org/v4/competitions/WC/standings?season=2026", {
+  const res = await fetch("https://api.football-data.org/v4/competitions/WC/matches?season=2026", {
     headers: { "X-Auth-Token": key }
   });
   const data = await res.json();
+  const matches = data.matches || [];
 
-  // Show structure of standings
-  const standings = data.standings || [];
-  return Response.json({
-    count: standings.length,
-    types: standings.map(s => ({ type: s.type, group: s.group, rows: s.table?.length })),
-    first_group_sample: standings[0]?.table?.slice(0,2).map(t => ({
-      team: t.team.shortName,
-      pts: t.points,
-      group: t.group  // does table row have group?
-    }))
-  });
+  // Show unique group values from matches
+  const groups = [...new Set(matches.map(m => m.group).filter(Boolean))].sort();
+  const sample = matches.filter(m => m.group === groups[0]).slice(0,2).map(m => ({
+    group: m.group,
+    home: m.homeTeam.shortName,
+    away: m.awayTeam.shortName,
+    stage: m.stage
+  }));
+
+  return Response.json({ groups, sample });
 }

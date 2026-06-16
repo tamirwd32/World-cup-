@@ -1,40 +1,42 @@
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const geminiKey = process.env.GEMINI_API_KEY;
-  const groqKey = process.env.GROQ_API_KEY;
+  const key = process.env.FOOTBALL_API_KEY;
+  if (!key) return Response.json({ error: "No FOOTBALL_API_KEY" });
 
-  const result = {
-    gemini_key_present: !!geminiKey,
-    gemini_key_prefix: geminiKey ? geminiKey.substring(0,8) : null,
-    groq_key_present: !!groqKey,
-    groq_key_prefix: groqKey ? groqKey.substring(0,8) : null,
-  };
+  const BASE = "https://v3.football.api-sports.io";
+  const headers = { "x-apisports-key": key };
 
-  // Test Groq if key exists
-  if (groqKey) {
-    try {
-      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${groqKey}`
-        },
-        body: JSON.stringify({
-          model: "llama-3.1-8b-instant",
-          messages: [{ role: "user", content: "Say: OK" }],
-          max_tokens: 5
-        })
-      });
-      const data = await res.json();
-      result.groq_status = res.status;
-      result.groq_ok = res.ok;
-      result.groq_answer = data?.choices?.[0]?.message?.content || null;
-      result.groq_error = data?.error || null;
-    } catch(e) {
-      result.groq_exception = e.message;
-    }
+  try {
+    // First check what leagues are available for 2026
+    const leaguesRes = await fetch(`${BASE}/leagues?season=2026&type=Cup`, { headers });
+    const leaguesData = await leaguesRes.json();
+
+    const leagues = (leaguesData.response || []).slice(0, 10).map(l => ({
+      id: l.league.id,
+      name: l.league.name,
+      country: l.country.name
+    }));
+
+    // Also try fixtures for league 1 (World Cup)
+    const fixRes = await fetch(`${BASE}/fixtures?league=1&season=2026&last=5`, { headers });
+    const fixData = await fixRes.json();
+
+    return Response.json({
+      football_api_status: leaguesRes.status,
+      leagues_found: leagues,
+      fixtures_status: fixRes.status,
+      fixtures_count: fixData.response?.length || 0,
+      fixtures_sample: (fixData.response || []).slice(0,2).map(f => ({
+        date: f.fixture.date,
+        home: f.teams.home.name,
+        away: f.teams.away.name,
+        score: `${f.goals.home}-${f.goals.away}`,
+        status: f.fixture.status.short
+      })),
+      fixtures_errors: fixData.errors
+    });
+  } catch(e) {
+    return Response.json({ error: e.message });
   }
-
-  return Response.json(result);
 }

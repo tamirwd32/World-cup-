@@ -7,15 +7,24 @@ export async function GET() {
   });
   const data = await res.json();
   const matches = data.matches || [];
+  const now = Date.now();
+  const in24h = now + 24*60*60*1000;
+  const in72h = now + 72*60*60*1000;
 
-  // Show unique group values from matches
-  const groups = [...new Set(matches.map(m => m.group).filter(Boolean))].sort();
-  const sample = matches.filter(m => m.group === groups[0]).slice(0,2).map(m => ({
-    group: m.group,
+  const next24 = matches.filter(m => {
+    const t = new Date(m.utcDate).getTime();
+    return (m.status==="TIMED"||m.status==="SCHEDULED") && t>=now && t<=in24h;
+  }).map(m => ({
     home: m.homeTeam.shortName,
     away: m.awayTeam.shortName,
-    stage: m.stage
+    utcDate: m.utcDate,
+    status: m.status
   }));
 
-  return Response.json({ groups, sample });
+  const next72 = matches.filter(m => {
+    const t = new Date(m.utcDate).getTime();
+    return (m.status==="TIMED"||m.status==="SCHEDULED") && t>=now && t<=in72h;
+  }).length;
+
+  return Response.json({ next24h_count: next24.length, next72h_count: next72, matches_next24h: next24 });
 }

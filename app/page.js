@@ -239,9 +239,11 @@ export default function Page() {
       });
       const fresh = await aRes.json();
       if (fresh.error || !fresh.bets) throw new Error("no bets");
-      const existing = new Set((analysis?.bets||[]).map(b=>b.match));
-      const newBets = fresh.bets.filter(b=>!existing.has(b.match));
-      const merged = newBets.length > 0 ? [...(analysis?.bets||[]), ...newBets] : [...(analysis?.bets||[]), ...fresh.bets];
+      // Deduplicate by match+pick combination
+      const existing = new Set((analysis?.bets||[]).map(b=>b.match+"|"+b.pick));
+      const newBets = fresh.bets.filter(b=>!existing.has(b.match+"|"+b.pick));
+      if (newBets.length === 0) { setLoadingMore(false); return; }
+      const merged = [...(analysis?.bets||[]), ...newBets];
       const updated = { ...analysis, bets: merged };
       setAnalysis(updated);
       try { localStorage.setItem(CACHE_KEY, JSON.stringify({ fixtures, analysis: updated })); } catch {}

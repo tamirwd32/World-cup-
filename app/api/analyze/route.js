@@ -1,128 +1,233 @@
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-// Prompt without emojis — works with all LLM providers
-const PROMPT = `You are a World Cup 2026 analyst. Today is June 16 2026, group stage matchday 2.
-Known results: Mexico 2-0 South Africa, South Korea 2-1 Czechia, Canada 1-1 Bosnia, USA 4-1 Paraguay, Brazil 1-1 Morocco, Scotland 1-0 Haiti, Germany 7-1 Curacao, Ivory Coast 1-0 Ecuador, Netherlands 2-2 Japan, Sweden 5-1 Tunisia, Belgium 0-1 Egypt, Spain 0-0 Cape Verde.
-Upcoming: France vs Senegal today 22:00 Israel, Iraq vs Norway today 21:00 Israel, England vs Croatia tomorrow 23:00 Israel, Portugal vs DR Congo tomorrow 20:00 Israel.
+// ─── Fetch live data from API-Football ───────────────────────────────────────
+async function fetchFootballData(apiKey) {
+  const headers = { "x-apisports-key": apiKey };
+  const BASE = "https://v3.football.api-sports.io";
+  const LEAGUE = 1;    // FIFA World Cup
+  const SEASON = 2026;
 
-Return ONLY a valid JSON object. No markdown, no backticks, no explanation before or after.
-Use these EXACT team name strings (copy exactly, they contain flag emojis):
-France="\u{1F1EB}\u{1F1F7} \u05E6\u05E8\u05E4\u05EA", Germany="\u{1F1E9}\u{1F1EA} \u05D2\u05E8\u05DE\u05E0\u05D9\u05D4", England="\uD83C\uDFF4\uDB40\uDC67\uDB40\uDC62\uDB40\uDC65\uDB40\uDC6E\uDB40\uDC67\uDB40\uDC7F \u05D0\u05E0\u05D2\u05DC\u05D9\u05D4", Spain="\u{1F1EA}\u{1F1F8} \u05E1\u05E4\u05E8\u05D3", Argentina="\u{1F1E6}\u{1F1F7} \u05D0\u05E8\u05D2\u05E0\u05D8\u05D9\u05E0\u05D4", Portugal="\u{1F1F5}\u{1F1F9} \u05E4\u05D5\u05E8\u05D8\u05D5\u05D2\u05DC"
+  const [fixturesRes, standingsRes] = await Promise.all([
+    fetch(`${BASE}/fixtures?league=${LEAGUE}&season=${SEASON}&timezone=Asia/Jerusalem`, { headers }),
+    fetch(`${BASE}/standings?league=${LEAGUE}&season=${SEASON}`, { headers }),
+  ]);
 
-{
-  "lastUpdated": "16.6.2026 \u2014 \u05D9\u05D5\u05DD 6",
-  "currentStage": "\u05E9\u05DC\u05D1 \u05D4\u05D1\u05EA\u05D9\u05DD",
-  "standings": [
-    {"rank":1,"team":"\u{1F1EB}\u{1F1F7} \u05E6\u05E8\u05E4\u05EA","prob":19,"odds":"+500","trend":"up","note":"\u05E1\u05D2\u05DC \u05E2\u05DE\u05D5\u05E7"},
-    {"rank":2,"team":"\u{1F1E9}\u{1F1EA} \u05D2\u05E8\u05DE\u05E0\u05D9\u05D4","prob":14,"odds":"+1400","trend":"up","note":"7-1 \u05E2\u05DC \u05E7\u05D5\u05E8\u05D0\u05E1\u05D0\u05D5"},
-    {"rank":3,"team":"\uD83C\uDFF4 \u05D0\u05E0\u05D2\u05DC\u05D9\u05D4","prob":13,"odds":"+650","trend":"flat","note":"\u05D1\u05D9\u05EA \u05E7\u05DC"},
-    {"rank":4,"team":"\u{1F1EA}\u{1F1F8} \u05E1\u05E4\u05E8\u05D3","prob":12,"odds":"+450","trend":"down","note":"0-0 \u05E7\u05D9\u05D9\u05E4 \u05D5\u05E8\u05D3\u05D4"},
-    {"rank":5,"team":"\u{1F1E6}\u{1F1F7} \u05D0\u05E8\u05D2\u05E0\u05D8\u05D9\u05E0\u05D4","prob":10,"odds":"+900","trend":"flat","note":"\u05DE\u05E1\u05D9 \u05D1\u05DF 39"},
-    {"rank":6,"team":"\u{1F1F5}\u{1F1F9} \u05E4\u05D5\u05E8\u05D8\u05D5\u05D2\u05DC","prob":9,"odds":"+850","trend":"flat","note":"\u05E8\u05D5\u05E0\u05D0\u05DC\u05D3\u05D5"}
-  ],
-  "results": [
-    {"group":"E","home":"\u05D2\u05E8\u05DE\u05E0\u05D9\u05D4","score":"7-1","away":"\u05E7\u05D5\u05E8\u05D0\u05E1\u05D0\u05D5","note":"xG 3.91"},
-    {"group":"H","home":"\u05E1\u05E4\u05E8\u05D3","score":"0-0","away":"\u05E7\u05D9\u05D9\u05E4 \u05D5\u05E8\u05D3\u05D4","note":"\u05D4\u05E4\u05EA\u05E2\u05D4"},
-    {"group":"G","home":"\u05D1\u05DC\u05D2\u05D9\u05D4","score":"0-1","away":"\u05DE\u05E6\u05E8\u05D9\u05DD","note":""},
-    {"group":"D","home":"\u05D0\u05E8\u05D4\u05D1","score":"4-1","away":"\u05E4\u05E8\u05D2\u05D5\u05D0\u05D9","note":""},
-    {"group":"C","home":"\u05D1\u05E8\u05D6\u05D9\u05DC","score":"1-1","away":"\u05DE\u05E8\u05D5\u05E7\u05D5","note":"\u05D5\u05D9\u05E0\u05D9\u05E1\u05D9\u05D5\u05E1 \u05D4\u05E6\u05D9\u05DC"},
-    {"group":"F","home":"\u05D4\u05D5\u05DC\u05E0\u05D3","score":"2-2","away":"\u05D9\u05E4\u05DF","note":"\u05D3\u05E8\u05DE\u05D8\u05D9"}
-  ],
-  "bets": [
-    {"match":"\u05E6\u05E8\u05E4\u05EA - \u05E1\u05E0\u05D2\u05DC","datetime":"\u05E9\u05DC\u05D9\u05E9\u05D9 16.6 \u05D1\u05E9\u05E2\u05D4 22:00","pick":"\u05E6\u05E8\u05E4\u05EA \u05DE\u05E0\u05E6\u05D7\u05EA 2:0","confidence":"high","odds":"~2.10","reason":"\u05DE\u05D1\u05D0\u05E4\u05D4 \u05D5\u05D0\u05D5\u05DC\u05D9\u05D6 \u05D7\u05D3\u05D9\u05DD, \u05E1\u05D2\u05DC \u05E2\u05DE\u05D5\u05E7 \u05DC\u05E2\u05D5\u05DE\u05EA \u05D4\u05D2\u05E0\u05EA \u05E1\u05E0\u05D2\u05DC"},
-    {"match":"\u05E2\u05D9\u05E8\u05D0\u05E7 - \u05E0\u05D5\u05E8\u05D5\u05D5\u05D2\u05D9\u05D4","datetime":"\u05E9\u05DC\u05D9\u05E9\u05D9 16.6 \u05D1\u05E9\u05E2\u05D4 21:00","pick":"\u05E0\u05D5\u05E8\u05D5\u05D5\u05D2\u05D9\u05D4 \u05DE\u05E0\u05E6\u05D7\u05EA 2:0","confidence":"high","odds":"~1.70","reason":"\u05D4\u05DC\u05D0\u05E0\u05D3 \u05DE\u05D5\u05DC \u05D4\u05D2\u05E0\u05D4 \u05D7\u05DC\u05E9\u05D4 \u05E9\u05DC \u05E2\u05D9\u05E8\u05D0\u05E7"},
-    {"match":"\u05D0\u05E0\u05D2\u05DC\u05D9\u05D4 - \u05E7\u05E8\u05D5\u05D0\u05D8\u05D9\u05D4","datetime":"\u05E8\u05D1\u05D9\u05E2\u05D9 17.6 \u05D1\u05E9\u05E2\u05D4 23:00","pick":"\u05D0\u05E0\u05D2\u05DC\u05D9\u05D4 \u05DE\u05E0\u05E6\u05D7\u05EA 2:1","confidence":"medium","odds":"~3.40","reason":"\u05E7\u05D9\u05D9\u05DF \u05D1\u05E9\u05D9\u05D0\u05D5, \u05E7\u05E8\u05D5\u05D0\u05D8\u05D9\u05D4 \u05DE\u05D6\u05D3\u05E7\u05E0\u05EA"},
-    {"match":"\u05E4\u05D5\u05E8\u05D8\u05D5\u05D2\u05DC - \u05E7\u05D5\u05E0\u05D2\u05D5 DR","datetime":"\u05E8\u05D1\u05D9\u05E2\u05D9 17.6 \u05D1\u05E9\u05E2\u05D4 20:00","pick":"\u05E4\u05D5\u05E8\u05D8\u05D5\u05D2\u05DC \u05DE\u05E0\u05E6\u05D7\u05EA 3:0","confidence":"high","odds":"~1.50","reason":"\u05E8\u05D5\u05E0\u05D0\u05DC\u05D3\u05D5 \u05DE\u05D5\u05DC \u05E0\u05D1\u05D7\u05E8\u05EA \u05D7\u05DC\u05E9\u05D4"}
-  ],
-  "analysis": "\u05E1\u05E4\u05E8\u05D3 0:0 \u05E2\u05DD \u05E7\u05D9\u05D9\u05E4 \u05D5\u05E8\u05D3\u05D4 \u2014 \u05D3\u05E4\u05D5\u05E1 \u05DE\u05D3\u05D0\u05D9\u05D2 \u05D7\u05D5\u05D6\u05E8. \u05D2\u05E8\u05DE\u05E0\u05D9\u05D4 7:1 \u05DE\u05E8\u05E9\u05D9\u05DD. \u05E6\u05E8\u05E4\u05EA \u05D4\u05DE\u05D5\u05E2\u05DE\u05D3\u05EA \u05D4\u05E8\u05D0\u05E9\u05D9\u05EA \u05DC\u05E4\u05E0\u05D9 \u05D9\u05D5\u05DD 6."
+  const fixturesData = await fixturesRes.json();
+  const standingsData = await standingsRes.json();
+
+  // Parse results (finished games)
+  const results = (fixturesData.response || [])
+    .filter(f => f.fixture.status.short === "FT")
+    .sort((a, b) => new Date(b.fixture.date) - new Date(a.fixture.date))
+    .slice(0, 16)
+    .map(f => ({
+      group: f.league.round?.replace("Group Stage - ", "Group ") || "",
+      home: f.teams.home.name,
+      score: `${f.goals.home}–${f.goals.away}`,
+      away: f.teams.away.name,
+      note: ""
+    }));
+
+  // Parse upcoming fixtures (next 48h)
+  const now = Date.now();
+  const in48h = now + 48 * 60 * 60 * 1000;
+  const upcoming = (fixturesData.response || [])
+    .filter(f => {
+      const t = new Date(f.fixture.date).getTime();
+      return f.fixture.status.short === "NS" && t >= now && t <= in48h;
+    })
+    .sort((a, b) => new Date(a.fixture.date) - new Date(b.fixture.date))
+    .map(f => {
+      const d = new Date(f.fixture.date);
+      const days = ["ראשון","שני","שלישי","רביעי","חמישי","שישי","שבת"];
+      const day = days[d.getDay()];
+      const dateStr = `${d.getDate()}.${d.getMonth()+1}`;
+      const time = `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
+      return {
+        home: f.teams.home.name,
+        away: f.teams.away.name,
+        datetime: `${day} ${dateStr} בשעה ${time}`,
+        round: f.league.round || ""
+      };
+    });
+
+  // Parse standings (group stage)
+  const groups = standingsData.response?.[0]?.league?.standings || [];
+  const groupStandings = groups.map(group =>
+    group.map(t => ({
+      team: t.team.name,
+      group: t.group,
+      played: t.all.played,
+      won: t.all.win,
+      drawn: t.all.draw,
+      lost: t.all.lose,
+      gf: t.all.goals.for,
+      ga: t.all.goals.against,
+      pts: t.points
+    }))
+  );
+
+  return { results, upcoming, groupStandings };
 }
 
-IMPORTANT: The JSON above is just the format template. Generate your own updated analysis based on the match data provided. Return ONLY the JSON, nothing else.`;
+// ─── AI analysis prompt ───────────────────────────────────────────────────────
+function buildPrompt(footballData) {
+  const { results, upcoming, groupStandings } = footballData;
 
-async function callGemini(key) {
+  const resultsText = results.length > 0
+    ? results.map(r => `${r.home} ${r.score} ${r.away} (${r.group})`).join(", ")
+    : "No results yet";
+
+  const upcomingText = upcoming.length > 0
+    ? upcoming.map(u => `${u.home} vs ${u.away} — ${u.datetime}`).join("\n")
+    : "No upcoming fixtures in next 48h";
+
+  const standingsText = groupStandings.length > 0
+    ? groupStandings.map(g =>
+        g.map(t => `${t.team}: ${t.pts}pts (${t.played}G ${t.won}W ${t.drawn}D ${t.lost}L)`).join(", ")
+      ).join(" | ")
+    : "Standings not available yet";
+
+  return `You are a World Cup 2026 football analyst. Based on the REAL live data below, provide analysis.
+
+LATEST RESULTS: ${resultsText}
+
+UPCOMING FIXTURES (next 48h):
+${upcomingText}
+
+GROUP STANDINGS: ${standingsText}
+
+Return ONLY a valid JSON object — no markdown, no backticks:
+{
+  "lastUpdated": "current date in Hebrew e.g. 16.6.2026 — יום 6",
+  "currentStage": "שלב הבתים",
+  "standings": [
+    {"rank":1,"team":"🇫🇷 צרפת","prob":19,"odds":"+500","trend":"up","note":"brief Hebrew note max 35 chars"}
+  ],
+  "results": [
+    {"group":"A","home":"team name in Hebrew","score":"X–Y","away":"team name in Hebrew","note":""}
+  ],
+  "bets": [
+    {"match":"Home – Away","datetime":"exact Hebrew datetime from fixtures above","pick":"exact scoreline prediction e.g. צרפת מנצחת 2:0","confidence":"high|medium|low","odds":"~X.XX","reason":"Hebrew reasoning max 100 chars"}
+  ],
+  "analysis": "2-3 Hebrew sentences on key insights from the latest results"
+}
+
+RULES:
+- standings: top 6 title contenders by win probability
+- bets: one bet per upcoming fixture, use EXACT datetime from the data above
+- results: use the real scores from the data, translate team names to Hebrew
+- Return ONLY valid JSON`;
+}
+
+// ─── LLM calls ────────────────────────────────────────────────────────────────
+async function callGemini(key, prompt) {
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: PROMPT }] }],
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
         generationConfig: { temperature: 0.2, maxOutputTokens: 2000 }
       })
     }
   );
   const data = await res.json();
-  if (res.status === 429) { const err = new Error("rate_limited"); err.code = 429; throw err; }
-  if (!res.ok) throw new Error("Gemini " + res.status + ": " + (data?.error?.message || ""));
+  if (res.status === 429) { const e = new Error("rate_limited"); e.code = 429; throw e; }
+  if (!res.ok) throw new Error("Gemini " + res.status);
   return data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
 }
 
-async function callGroq(key) {
+async function callGroq(key, prompt) {
   const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${key}`
-    },
+    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${key}` },
     body: JSON.stringify({
       model: "llama-3.3-70b-versatile",
       messages: [
-        {
-          role: "system",
-          content: "You are a JSON-only API. You must respond with a single valid JSON object and nothing else. No markdown, no backticks, no explanation. Only pure JSON."
-        },
-        { role: "user", content: PROMPT }
+        { role: "system", content: "You are a JSON-only API. Respond with a single valid JSON object and nothing else. No markdown, no backticks." },
+        { role: "user", content: prompt }
       ],
       temperature: 0.2,
       max_tokens: 2000
     })
   });
   const data = await res.json();
-  if (!res.ok) throw new Error("Groq " + res.status + ": " + (data?.error?.message || ""));
+  if (!res.ok) throw new Error("Groq " + res.status);
   return data?.choices?.[0]?.message?.content || "";
 }
 
-function parseResponse(text) {
+function parseJSON(text) {
   const clean = text.replace(/```json|```/g, "").trim();
-  let parsed;
-  try { parsed = JSON.parse(clean); }
+  try { return JSON.parse(clean); }
   catch {
     const m = clean.match(/\{[\s\S]*\}/);
-    if (!m) throw new Error("No JSON in response");
-    parsed = JSON.parse(m[0]);
+    if (!m) throw new Error("No JSON found");
+    return JSON.parse(m[0]);
   }
-  if (!parsed.standings || !Array.isArray(parsed.standings)) throw new Error("Invalid shape");
-  return parsed;
 }
 
+// ─── Main handler ─────────────────────────────────────────────────────────────
 export async function POST() {
-  const geminiKey = process.env.GEMINI_API_KEY;
-  const groqKey = process.env.GROQ_API_KEY;
+  const footballKey = process.env.FOOTBALL_API_KEY;
+  const geminiKey   = process.env.GEMINI_API_KEY;
+  const groqKey     = process.env.GROQ_API_KEY;
 
-  // Try Gemini first
+  // Step 1: Fetch real football data
+  let footballData = { results: [], upcoming: [], groupStandings: [] };
+  if (footballKey) {
+    try {
+      footballData = await fetchFootballData(footballKey);
+    } catch(e) {
+      console.error("Football API error:", e.message);
+      // Continue without live data — AI will use its own knowledge
+    }
+  }
+
+  // Step 2: Build prompt with real data
+  const prompt = buildPrompt(footballData);
+
+  // Step 3: Get AI analysis — Gemini first, Groq as fallback
+  let text = "";
+  let provider = "unknown";
+
   if (geminiKey) {
     try {
-      const text = await callGemini(geminiKey);
-      const parsed = parseResponse(text);
-      return Response.json({ ...parsed, provider: "gemini" }, { headers: { "Cache-Control": "no-store" } });
+      text = await callGemini(geminiKey, prompt);
+      provider = "gemini";
     } catch(e) {
       if (e.code !== 429 && !groqKey) {
-        return Response.json({ error: String(e?.message || e) }, { status: 502 });
+        return Response.json({ error: "שגיאת Gemini: " + e.message }, { status: 502 });
       }
     }
   }
 
-  // Fallback: Groq
-  if (groqKey) {
+  if (!text && groqKey) {
     try {
-      const text = await callGroq(groqKey);
-      const parsed = parseResponse(text);
-      return Response.json({ ...parsed, provider: "groq" }, { headers: { "Cache-Control": "no-store" } });
+      text = await callGroq(groqKey, prompt);
+      provider = "groq";
     } catch(e) {
-      return Response.json({ error: "כל ספקי ה-AI אינם זמינים כרגע. נסו שוב בעוד מספר דקות." }, { status: 502 });
+      return Response.json({ error: "כל ספקי ה-AI אינם זמינים. נסו שוב בעוד מספר דקות." }, { status: 502 });
     }
   }
 
-  return Response.json({ error: "לא מוגדר מפתח API. בדוק את הגדרות Vercel." }, { status: 500 });
+  if (!text) {
+    return Response.json({ error: "לא מוגדר מפתח AI." }, { status: 500 });
+  }
+
+  try {
+    const parsed = parseJSON(text);
+    if (!parsed.standings) throw new Error("Invalid shape");
+
+    // Inject real results if AI didn't return them properly
+    if (footballData.results.length > 0 && (!parsed.results || parsed.results.length === 0)) {
+      parsed.results = footballData.results;
+    }
+
+    return Response.json({ ...parsed, provider }, { headers: { "Cache-Control": "no-store" } });
+  } catch(e) {
+    return Response.json({ error: "שגיאה בניתוח תשובת ה-AI: " + e.message }, { status: 502 });
+  }
 }

@@ -1,6 +1,11 @@
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
+// Sanitize team names to avoid breaking JSON in AI prompts
+function safe(name) {
+  return (name || "").replace(/"/g, "'").replace(/\\/g, "");
+}
+
 async function callGemini(key, prompt) {
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`,
@@ -43,7 +48,7 @@ function parseJSON(text) {
   try { return JSON.parse(clean); }
   catch {
     const m = clean.match(/\{[\s\S]*\}/);
-    if (!m) throw new Error("No JSON found");
+    if (!m) throw new Error("No JSON found in response");
     return JSON.parse(m[0]);
   }
 }
@@ -52,50 +57,57 @@ export async function POST(req) {
   const geminiKey = process.env.GEMINI_API_KEY;
   const groqKey   = process.env.GROQ_API_KEY;
 
-  // Receive fixtures data from client (passed from /api/fixtures call)
   let fixturesData = {};
   try { fixturesData = await req.json(); } catch {}
 
   const { results=[], upcoming=[], groups=[], currentStage="שלב הבתים" } = fixturesData;
 
+  // Sanitize all team names to avoid JSON-breaking characters
   const resultsText = results.length > 0
-    ? results.slice(0,12).map(r=>`${r.home} ${r.score} ${r.away} (${r.group})`).join(", ")
+    ? results.slice(0,12).map(r=>`${safe(r.home)} ${r.score} ${safe(r.away)} (${r.group})`).join(", ")
     : "No results yet";
 
   const upcomingText = upcoming.length > 0
-    ? upcoming.map(u=>`${u.home} vs ${u.away} — ${u.datetime}`).join("\n")
+    ? upcoming.map(u=>`${safe(u.home)} vs ${safe(u.away)} - ${u.datetime}`).join("\n")
     : "No upcoming fixtures";
 
   const standingsText = groups.length > 0
     ? groups.map(g=>
-        `${g.group}: ` + g.table.map(t=>`${t.team} ${t.pts}pts`).join(", ")
+        `${g.group}: ` + g.table.map(t=>`${safe(t.team)} ${t.pts}pts (${t.played}G)`).join(", ")
       ).join(" | ")
     : "Not available";
 
-  const prompt = `You are a World Cup 2026 analyst. Based on REAL live data:
+  const prompt = `You are a World Cup 2026 analyst. Analyze this REAL live data:
 
 RESULTS: ${resultsText}
-UPCOMING: ${upcomingText}
+UPCOMING FIXTURES: ${upcomingText}
 STANDINGS: ${standingsText}
-CURRENT STAGE: ${currentStage}
+STAGE: ${currentStage}
 
-Return ONLY valid JSON:
+Return ONLY a valid JSON object. No markdown, no backticks, nothing else before or after.
+IMPORTANT: Team names must NOT contain double-quote characters. Use single quotes or Hebrew only.
+
 {
-  "lastUpdated": "Hebrew date e.g. 16.6.2026 — יום 6",
+  "lastUpdated": "16.6.2026 - יום 6",
   "standings": [
-    {"rank":1,"team":"🇫🇷 צרפת","prob":19,"odds":"+500","trend":"up","note":"Hebrew max 35 chars"}
+    {"rank":1,"team":"צרפת","prob":19,"odds":"+500","trend":"up","note":"סגל עמוק"},
+    {"rank":2,"team":"גרמניה","prob":14,"odds":"+1400","trend":"up","note":"7-1 על קוראסאו"},
+    {"rank":3,"team":"אנגליה","prob":13,"odds":"+650","trend":"flat","note":"בית קל"},
+    {"rank":4,"team":"ספרד","prob":12,"odds":"+450","trend":"down","note":"0-0 קייפ ורדה"},
+    {"rank":5,"team":"ארגנטינה","prob":10,"odds":"+900","trend":"flat","note":"מסי בן 39"},
+    {"rank":6,"team":"פורטוגל","prob":9,"odds":"+850","trend":"flat","note":"רונאלדו"}
   ],
   "bets": [
-    {"match":"Home – Away","datetime":"exact datetime from upcoming","pick":"prediction WITH scoreline","confidence":"high|medium|low","odds":"~X.XX","reason":"Hebrew max 100 chars"}
+    {"match":"קבוצה א - קבוצה ב","datetime":"שעה מדויקת מהנתונים","pick":"תחזית מדויקת עם תוצאה למשל צרפת מנצחת 2:0","confidence":"high","odds":"~2.10","reason":"נימוק קצר בעברית"}
   ],
-  "analysis": "2-3 Hebrew sentences on key insights from latest results and standings"
+  "analysis": "2-3 משפטים בעברית על תובנות מרכזיות"
 }
 
 Rules:
-- standings: top 6 title contenders by win probability, with flag emojis
-- bets: one per upcoming fixture, exact datetime from data
-- analysis: insightful, based on real results
-- Return ONLY valid JSON`;
+- standings: top 6 with flag emojis in team names (use Unicode, not ASCII quotes)
+- bets: one per upcoming fixture, exact datetime from data above
+- analysis: based on real results
+- CRITICAL: no double-quote marks inside any JSON string values`;
 
   let text = "";
   let provider = "unknown";
@@ -107,14 +119,14 @@ Rules:
 
   if (!text && groqKey) {
     try { text = await callGroq(groqKey, prompt); provider = "groq"; }
-    catch(e) { return Response.json({ error: "כל ספקי ה-AI אינם זמינים. נסו שוב בעוד מספר דקות." }, { status: 502 }); }
+    catch(e) { return Response.json({ error: "כל ספקי ה-AI אינם זמינים. נסו שוב." }, { status: 502 }); }
   }
 
   if (!text) return Response.json({ error: "לא מוגדר מפתח AI." }, { status: 500 });
 
   try {
     const parsed = parseJSON(text);
-    if (!parsed.standings) throw new Error("Invalid shape");
+    if (!parsed.standings) throw new Error("Invalid shape - missing standings");
     return Response.json({ ...parsed, provider }, { headers: { "Cache-Control": "no-store" } });
   } catch(e) {
     return Response.json({ error: "שגיאה בניתוח: " + e.message }, { status: 502 });

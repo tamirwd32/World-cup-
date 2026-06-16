@@ -1,292 +1,291 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 
-const CACHE_KEY = "wc2026_data";
+const CACHE_KEY = "wc2026_v3";
 
-const styles = `
+const S = `
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap');
-
   :root {
-    --grass:   #1a7c3e;
-    --grass2:  #22a35a;
-    --pitch:   #f7fdf9;
-    --white:   #ffffff;
-    --gold:    #f5a623;
-    --gold2:   #e8931a;
-    --red:     #e03535;
-    --green:   #1a7c3e;
-    --blue:    #1a56db;
-    --text:    #111827;
-    --muted:   #6b7280;
-    --border:  #d1fae5;
-    --card:    #ffffff;
-    --card2:   #f0fdf4;
+    --g1:#0d5c2e; --g2:#1a7c3e; --g3:#22a35a;
+    --pitch:#f7fdf9; --white:#fff;
+    --gold:#f5a623; --gold2:#e8931a; --goldbg:#fef3c7;
+    --red:#e03535; --redbg:#fee2e2;
+    --blue:#1a56db;
+    --text:#111827; --muted:#6b7280;
+    --border:#d1fae5; --card:#fff; --card2:#f0fdf4;
+    --qual:#d1fae5; --qualtext:#065f46;
   }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--pitch);color:var(--text);font-family:'Inter',sans-serif;min-height:100vh;}
+  .app{max-width:960px;margin:0 auto;padding:0 0 80px;}
 
-  * { box-sizing:border-box; margin:0; padding:0; }
-  body { background:var(--pitch); color:var(--text); font-family:'Inter',sans-serif; min-height:100vh; }
-  .app { max-width:960px; margin:0 auto; padding:0 0 80px; }
+  /* Hero */
+  .hero{background:linear-gradient(150deg,#0a4a24 0%,var(--g2) 60%,var(--g3) 100%);padding:36px 24px 30px;text-align:center;position:relative;overflow:hidden;}
+  .hero::before{content:'';position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent,transparent 40px,rgba(255,255,255,.03) 40px,rgba(255,255,255,.03) 80px);}
+  .hero-bg{position:absolute;inset:0;opacity:.06;display:flex;align-items:center;justify-content:center;gap:80px;font-size:120px;pointer-events:none;user-select:none;}
+  .hero-eyebrow{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:4px;color:rgba(255,255,255,.7);text-transform:uppercase;margin-bottom:8px;position:relative;}
+  .hero-icons{font-size:30px;margin-bottom:6px;position:relative;letter-spacing:8px;}
+  .hero-title{font-family:'Bebas Neue',sans-serif;font-size:clamp(52px,10vw,92px);line-height:1;color:#fff;letter-spacing:3px;position:relative;}
+  .hero-title span{color:var(--gold);text-shadow:0 2px 24px rgba(245,166,35,.6);}
+  .hero-sub{font-size:12px;color:rgba(255,255,255,.65);margin-top:8px;font-family:'JetBrains Mono',monospace;position:relative;}
 
-  /* ── Hero ── */
-  .hero {
-    background: linear-gradient(150deg, #0a4a24 0%, #1a7c3e 60%, #22a35a 100%);
-    padding: 36px 24px 32px;
-    text-align: center;
-    position: relative;
-    overflow: hidden;
-  }
-  .hero-bg {
-    position: absolute;
-    inset: 0;
-    opacity: 0.07;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 80px;
-    font-size: 120px;
-    pointer-events: none;
-    user-select: none;
-  }
-  /* Grass stripes */
-  .hero::before {
-    content:'';
-    position:absolute;
-    inset:0;
-    background: repeating-linear-gradient(90deg,transparent,transparent 40px,rgba(255,255,255,.03) 40px,rgba(255,255,255,.03) 80px);
-  }
-  .hero-eyebrow { font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:4px; color:rgba(255,255,255,.7); text-transform:uppercase; margin-bottom:8px; position:relative; }
-  .hero-title { font-family:'Bebas Neue',sans-serif; font-size:clamp(56px,10vw,96px); line-height:1; color:#fff; letter-spacing:3px; position:relative; }
-  .hero-title span { color:var(--gold); text-shadow:0 2px 24px rgba(245,166,35,.6); }
-  .hero-sub { font-size:13px; color:rgba(255,255,255,.7); margin-top:8px; font-family:'JetBrains Mono',monospace; position:relative; }
-  .hero-icons { font-size:32px; margin-bottom:8px; position:relative; letter-spacing:8px; }
+  /* Refresh bar */
+  .rbar{display:flex;align-items:center;justify-content:space-between;padding:11px 20px;background:#fff;border-bottom:2px solid var(--border);position:sticky;top:0;z-index:10;box-shadow:0 2px 8px rgba(0,0,0,.06);}
+  .rstatus{font-size:12px;color:var(--muted);font-family:'JetBrains Mono',monospace;}
+  .rstatus strong{color:var(--text);}
+  .rbtn{display:flex;align-items:center;gap:7px;padding:8px 18px;background:linear-gradient(135deg,var(--g2),var(--g3));color:#fff;border:none;border-radius:50px;font-weight:700;font-size:13px;cursor:pointer;transition:all .2s;box-shadow:0 2px 8px rgba(26,124,62,.3);}
+  .rbtn:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(26,124,62,.4);}
+  .rbtn:disabled{opacity:.5;cursor:not-allowed;transform:none;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .spinner{width:13px;height:13px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+  .ldot{width:7px;height:7px;background:#ff4444;border-radius:50%;animation:pulse 1.4s ease-in-out infinite;}
 
-  /* ── Refresh bar ── */
-  .refresh-bar {
-    display:flex; align-items:center; justify-content:space-between;
-    padding:12px 20px; background:#fff;
-    border-bottom:2px solid var(--border);
-    position:sticky; top:0; z-index:10;
-    box-shadow:0 2px 8px rgba(0,0,0,.06);
-  }
-  .refresh-status { font-size:12px; color:var(--muted); font-family:'JetBrains Mono',monospace; }
-  .refresh-status strong { color:var(--text); }
-  .refresh-btn {
-    display:flex; align-items:center; gap:8px;
-    padding:9px 20px;
-    background:linear-gradient(135deg,var(--grass),var(--grass2));
-    color:#fff; border:none; border-radius:50px;
-    font-weight:700; font-size:13px; cursor:pointer;
-    transition:all .2s;
-    box-shadow:0 2px 8px rgba(26,124,62,.3);
-  }
-  .refresh-btn:hover { transform:translateY(-1px); box-shadow:0 4px 12px rgba(26,124,62,.4); }
-  .refresh-btn:disabled { opacity:.5; cursor:not-allowed; transform:none; }
-  @keyframes spin { to { transform:rotate(360deg); } }
-  .spinner { width:14px; height:14px; border:2px solid rgba(255,255,255,.3); border-top-color:#fff; border-radius:50%; animation:spin .7s linear infinite; }
-  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
-  .live-dot { width:8px; height:8px; background:#ff4444; border-radius:50%; animation:pulse 1.4s ease-in-out infinite; }
+  /* Error */
+  .err{margin:14px 20px;padding:11px 16px;background:#fff5f5;border:1px solid #feb2b2;border-radius:10px;color:var(--red);font-size:13px;text-align:center;}
 
-  /* ── Error ── */
-  .error-box { margin:16px 20px; padding:12px 16px; background:#fff5f5; border:1px solid #feb2b2; border-radius:10px; color:var(--red); font-size:13px; text-align:center; }
+  /* Tabs */
+  .tabs{display:flex;background:#fff;border-bottom:2px solid var(--border);overflow-x:auto;scrollbar-width:none;}
+  .tabs::-webkit-scrollbar{display:none;}
+  .tab{flex:none;padding:13px 14px 11px;border:none;border-bottom:3px solid transparent;background:transparent;color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;transition:all .2s;white-space:nowrap;margin-bottom:-2px;}
+  .tab.active{color:var(--g2);border-bottom-color:var(--g2);}
+  .tab:hover:not(.active){color:var(--text);}
 
-  /* ── Tabs ── */
-  .tabs { display:flex; background:#fff; border-bottom:2px solid var(--border); padding:0 20px; }
-  .tab { flex:1; padding:14px 8px 12px; border:none; border-bottom:3px solid transparent; background:transparent; color:var(--muted); font-size:13px; font-weight:600; cursor:pointer; transition:all .2s; text-align:center; margin-bottom:-2px; }
-  .tab.active { color:var(--grass); border-bottom-color:var(--grass); }
-  .tab:hover:not(.active) { color:var(--text); }
+  .content{padding:16px;}
 
-  /* ── Content ── */
-  .content { padding:20px; }
+  /* Card */
+  .card{background:var(--card);border:1px solid #e5f5ec;border-radius:16px;padding:18px;margin-bottom:14px;box-shadow:0 1px 4px rgba(0,0,0,.05);}
+  .ctitle{font-family:'Bebas Neue',sans-serif;font-size:21px;letter-spacing:1px;color:var(--g2);margin-bottom:14px;padding-bottom:10px;border-bottom:2px solid var(--border);}
+  .empty{color:var(--muted);font-size:13px;text-align:center;padding:24px 0;}
 
-  /* ── Card ── */
-  .card { background:var(--card); border:1px solid #e5f5ec; border-radius:16px; padding:20px; margin-bottom:16px; box-shadow:0 1px 4px rgba(0,0,0,.05); }
-  .card-title { font-family:'Bebas Neue',sans-serif; font-size:22px; letter-spacing:1px; color:var(--grass); margin-bottom:16px; padding-bottom:12px; border-bottom:2px solid var(--border); }
+  /* Win probability table */
+  .wtable{width:100%;border-collapse:collapse;}
+  .wtable th{text-align:right;padding:7px 10px;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);}
+  .wtable td{padding:11px 10px;border-bottom:1px solid #f0faf4;vertical-align:middle;}
+  .wtable tr:last-child td{border-bottom:none;}
+  .wtable tr:hover td{background:#f0fdf4;}
+  .rbadge{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;font-weight:800;font-size:12px;font-family:'JetBrains Mono',monospace;}
+  .rb1{background:linear-gradient(135deg,var(--gold),var(--gold2));color:#fff;box-shadow:0 2px 8px rgba(245,166,35,.4);}
+  .rb2{background:#e5e7eb;color:#374151;}
+  .rb3{background:#fde68a;color:#92400e;}
+  .rb4,.rb5,.rb6{background:#f3f4f6;color:var(--muted);}
+  .pbar-wrap{display:flex;align-items:center;gap:8px;}
+  .pbar-bg{flex:1;height:7px;background:#e5f5ec;border-radius:4px;overflow:hidden;}
+  .pbar-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,var(--g2),var(--g3));transition:width .6s ease;}
+  .ptext{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:var(--g2);min-width:36px;text-align:left;}
+  .trend{font-size:11px;font-weight:700;padding:2px 7px;border-radius:20px;font-family:'JetBrains Mono',monospace;}
+  .trend-up{background:#d1fae5;color:#065f46;}
+  .trend-down{background:var(--redbg);color:#991b1b;}
+  .trend-flat{background:#f3f4f6;color:var(--muted);}
+  .abox{margin-top:14px;padding:13px 15px;background:linear-gradient(135deg,#f0fdf4,#dcfce7);border-radius:10px;border-right:4px solid var(--g2);}
+  .alabel{font-size:10px;color:var(--g2);font-family:'JetBrains Mono',monospace;letter-spacing:2px;margin-bottom:5px;}
+  .atext{font-size:13px;line-height:1.7;color:var(--text);}
 
-  /* ── Standings ── */
-  .standings { width:100%; border-collapse:collapse; }
-  .standings th { text-align:right; padding:8px 10px; font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--muted); border-bottom:1px solid var(--border); }
-  .standings td { padding:12px 10px; border-bottom:1px solid #f0faf4; vertical-align:middle; }
-  .standings tr:last-child td { border-bottom:none; }
-  .standings tr:hover td { background:#f0fdf4; }
+  /* Results grid */
+  .rgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:10px;}
+  .ritem{background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:12px;text-align:center;position:relative;overflow:hidden;}
+  .ritem::before{content:'⚽';position:absolute;top:-8px;right:-6px;font-size:28px;opacity:.05;transform:rotate(15deg);}
+  .rgroup{font-size:10px;color:var(--muted);font-family:'JetBrains Mono',monospace;letter-spacing:1px;margin-bottom:5px;}
+  .rhome{font-size:13px;font-weight:700;}
+  .rscore{font-family:'Bebas Neue',sans-serif;font-size:30px;letter-spacing:3px;color:var(--g2);margin:2px 0;line-height:1;}
+  .raway{font-size:12px;font-weight:600;color:var(--muted);}
 
-  .rank-badge { display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; border-radius:50%; font-weight:800; font-size:12px; font-family:'JetBrains Mono',monospace; }
-  .rank-1 { background:linear-gradient(135deg,#f5a623,#e8931a); color:#fff; box-shadow:0 2px 8px rgba(245,166,35,.4); }
-  .rank-2 { background:#e5e7eb; color:#374151; }
-  .rank-3 { background:#fde68a; color:#92400e; }
-  .rank-4,.rank-5,.rank-6 { background:#f3f4f6; color:var(--muted); }
+  /* Schedule */
+  .slist{display:flex;flex-direction:column;gap:8px;}
+  .sday-header{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:2px;color:var(--g2);text-transform:uppercase;margin:12px 0 6px;padding-right:4px;}
+  .sday-header:first-child{margin-top:0;}
+  .smatch{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;background:var(--card2);border:1px solid var(--border);border-radius:10px;}
+  .smatch-teams{font-weight:600;font-size:14px;flex:1;}
+  .smatch-vs{color:var(--muted);font-weight:400;margin:0 4px;}
+  .smatch-time{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:var(--g2);background:#d1fae5;padding:3px 8px;border-radius:6px;white-space:nowrap;}
+  .smatch-group{font-size:11px;color:var(--muted);margin-top:2px;}
 
-  .prob-bar-wrap { display:flex; align-items:center; gap:8px; }
-  .prob-bar-bg { flex:1; height:8px; background:#e5f5ec; border-radius:4px; overflow:hidden; }
-  .prob-bar-fill { height:100%; border-radius:4px; background:linear-gradient(90deg,var(--grass),var(--grass2)); transition:width .6s ease; }
-  .prob-text { font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:700; color:var(--grass); min-width:38px; text-align:left; }
+  /* Group standings table */
+  .group-section{margin-bottom:20px;}
+  .group-title{font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1px;color:var(--g2);margin-bottom:8px;padding:6px 10px;background:var(--card2);border-radius:8px;border-right:3px solid var(--g2);}
+  .gtable{width:100%;border-collapse:collapse;font-size:12px;}
+  .gtable th{text-align:center;padding:6px 6px;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);}
+  .gtable th:first-child{text-align:right;}
+  .gtable td{padding:9px 6px;text-align:center;border-bottom:1px solid #f0faf4;}
+  .gtable td:first-child{text-align:right;font-weight:600;}
+  .gtable tr:last-child td{border-bottom:none;}
+  .gtable tr.qualified td:first-child{color:var(--g2);font-weight:700;}
+  .gtable tr.qualified{background:rgba(209,250,229,.2);}
+  .qual-dot{display:inline-block;width:7px;height:7px;background:var(--g3);border-radius:50%;margin-left:4px;vertical-align:middle;}
+  .gd-pos{color:var(--g2);}
+  .gd-neg{color:var(--red);}
 
-  .trend { font-size:11px; font-weight:700; padding:3px 8px; border-radius:20px; font-family:'JetBrains Mono',monospace; }
-  .trend-up   { background:#d1fae5; color:#065f46; }
-  .trend-down { background:#fee2e2; color:#991b1b; }
-  .trend-flat { background:#f3f4f6; color:var(--muted); }
+  /* Bracket */
+  .bracket-stage{margin-bottom:20px;}
+  .bracket-stage-title{font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1px;color:var(--g1);margin-bottom:10px;text-align:center;}
+  .bracket-match{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--card2);border:1px solid var(--border);border-radius:12px;margin-bottom:8px;}
+  .bteam{font-weight:700;font-size:14px;flex:1;}
+  .bteam.winner{color:var(--g2);}
+  .bscore{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px;color:var(--g2);margin:0 12px;}
+  .bdate{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);}
 
-  .analysis-box { margin-top:16px; padding:14px 16px; background:linear-gradient(135deg,#f0fdf4,#dcfce7); border-radius:10px; border-right:4px solid var(--grass); }
-  .analysis-label { font-size:10px; color:var(--grass); font-family:'JetBrains Mono',monospace; letter-spacing:2px; margin-bottom:6px; }
-  .analysis-text { font-size:13px; line-height:1.7; color:var(--text); }
+  /* Bets */
+  .sbadge{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;background:linear-gradient(135deg,var(--g2),var(--g3));color:#fff;border-radius:50px;font-size:12px;font-weight:700;margin-bottom:14px;box-shadow:0 2px 8px rgba(26,124,62,.3);}
+  .blist{display:flex;flex-direction:column;gap:10px;}
+  .bitem{background:#fff;border:1px solid var(--border);border-radius:14px;padding:14px 16px;position:relative;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.04);}
+  .bitem::after{content:'';position:absolute;top:0;right:0;width:4px;height:100%;}
+  .bitem::before{content:'⚽';position:absolute;bottom:-10px;left:-10px;font-size:56px;opacity:.04;pointer-events:none;}
+  .bitem.high::after{background:var(--g3);}
+  .bitem.medium::after{background:var(--gold);}
+  .bitem.low::after{background:var(--red);}
+  .bhdr{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:4px;}
+  .bmatch{font-weight:700;font-size:14px;}
+  .bconf{font-family:'JetBrains Mono',monospace;font-size:11px;padding:3px 9px;border-radius:20px;font-weight:700;white-space:nowrap;}
+  .ch{background:#d1fae5;color:#065f46;}
+  .cm{background:var(--goldbg);color:#92400e;}
+  .cl{background:var(--redbg);color:#991b1b;}
+  .btime{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--blue);margin-bottom:8px;}
+  .bpick{font-family:'Bebas Neue',sans-serif;font-size:21px;letter-spacing:1px;color:var(--g2);margin-bottom:4px;}
+  .breason{font-size:12px;color:var(--muted);line-height:1.5;}
+  .bodds{display:inline-block;margin-top:7px;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:var(--gold2);background:var(--goldbg);padding:2px 8px;border-radius:4px;}
+  .lmbtn{width:100%;margin-top:12px;padding:12px;background:#fff;border:2px dashed var(--g2);border-radius:10px;color:var(--g2);font-size:13px;font-weight:700;cursor:pointer;transition:all .2s;}
+  .lmbtn:hover:not(:disabled){background:var(--card2);}
+  .lmbtn:disabled{opacity:.45;cursor:not-allowed;}
+  .disc{font-size:11px;color:var(--muted);text-align:center;padding:10px;border-top:1px solid var(--border);margin-top:14px;font-style:italic;}
 
-  /* ── Results ── */
-  .results-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:12px; }
-  .result-item {
-    background:var(--card2);
-    border:1px solid var(--border);
-    border-radius:12px;
-    padding:14px 12px;
-    text-align:center;
-    position:relative;
-    overflow:hidden;
-  }
-  .result-item::before {
-    content:'⚽';
-    position:absolute;
-    top:-8px; right:-8px;
-    font-size:32px;
-    opacity:.06;
-    transform:rotate(15deg);
-  }
-  .result-group { font-size:10px; color:var(--muted); font-family:'JetBrains Mono',monospace; letter-spacing:1px; margin-bottom:6px; }
-  .result-home { font-size:13px; font-weight:700; }
-  .result-score { font-family:'Bebas Neue',sans-serif; font-size:32px; letter-spacing:3px; color:var(--grass); margin:4px 0; line-height:1; }
-  .result-away { font-size:12px; font-weight:600; color:var(--muted); }
-  .result-note { font-size:11px; color:var(--gold2); margin-top:4px; font-weight:600; }
+  .ts{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);text-align:center;margin-top:20px;}
+  .cbadge{font-size:11px;color:var(--gold2);background:var(--goldbg);padding:2px 8px;border-radius:4px;font-family:'JetBrains Mono',monospace;margin-right:8px;}
 
-  /* ── Bets ── */
-  .stage-badge { display:inline-flex; align-items:center; gap:6px; padding:5px 14px; background:linear-gradient(135deg,var(--grass),var(--grass2)); color:#fff; border-radius:50px; font-size:12px; font-weight:700; margin-bottom:16px; box-shadow:0 2px 8px rgba(26,124,62,.3); }
-  .bet-list { display:flex; flex-direction:column; gap:12px; }
-  .bet-item {
-    background:#fff;
-    border:1px solid var(--border);
-    border-radius:14px;
-    padding:16px;
-    position:relative;
-    overflow:hidden;
-    box-shadow:0 1px 4px rgba(0,0,0,.04);
-  }
-  .bet-item::after {
-    content:'';
-    position:absolute;
-    top:0; right:0;
-    width:4px; height:100%;
-  }
-  .bet-item.high::after   { background:var(--grass2); }
-  .bet-item.medium::after { background:var(--gold); }
-  .bet-item.low::after    { background:var(--red); }
-
-  /* Watermark ball */
-  .bet-item::before {
-    content:'⚽';
-    position:absolute;
-    bottom:-10px; left:-10px;
-    font-size:60px;
-    opacity:.04;
-    pointer-events:none;
-  }
-
-  .bet-header { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:6px; }
-  .bet-match { font-weight:700; font-size:15px; color:var(--text); }
-  .bet-confidence { font-family:'JetBrains Mono',monospace; font-size:11px; padding:3px 10px; border-radius:20px; font-weight:700; white-space:nowrap; }
-  .conf-high   { background:#d1fae5; color:#065f46; }
-  .conf-medium { background:#fef3c7; color:#92400e; }
-  .conf-low    { background:#fee2e2; color:#991b1b; }
-
-  .bet-time { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--blue); margin-bottom:10px; }
-  .bet-pick { font-family:'Bebas Neue',sans-serif; font-size:22px; letter-spacing:1px; color:var(--grass); margin-bottom:6px; }
-  .bet-reason { font-size:12px; color:var(--muted); line-height:1.5; }
-  .bet-odds { display:inline-block; margin-top:8px; font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:700; color:var(--gold2); background:#fef3c7; padding:2px 8px; border-radius:4px; }
-
-  .load-more-btn { width:100%; margin-top:14px; padding:13px; background:#fff; border:2px dashed var(--grass); border-radius:10px; color:var(--grass); font-size:13px; font-weight:700; cursor:pointer; transition:all .2s; }
-  .load-more-btn:hover:not(:disabled) { background:#f0fdf4; }
-  .load-more-btn:disabled { opacity:.45; cursor:not-allowed; }
-
-  .disclaimer { font-size:11px; color:var(--muted); text-align:center; padding:12px; border-top:1px solid var(--border); margin-top:16px; font-style:italic; }
-  .timestamp { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--muted); text-align:center; margin-top:24px; }
-  .cached-badge { font-size:11px; color:var(--gold2); background:#fef3c7; padding:2px 8px; border-radius:4px; font-family:'JetBrains Mono',monospace; }
-
-  @media (max-width:600px) {
-    .standings th:nth-child(4),.standings td:nth-child(4) { display:none; }
+  @media(max-width:600px){
+    .wtable th:nth-child(4),.wtable td:nth-child(4){display:none;}
+    .gtable th:nth-child(6),.gtable td:nth-child(6){display:none;}
   }
 `;
 
-const SEED = {
-  lastUpdated: "טוען...",
-  currentStage: "שלב הבתים",
-  standings: [
-    { rank:1, team:"🇫🇷 צרפת", prob:19, odds:"+500", trend:"up", note:"סגל עמוק" },
-    { rank:2, team:"🇩🇪 גרמניה", prob:14, odds:"+1400", trend:"up", note:"7–1 על קוראסאו" },
-    { rank:3, team:"🏴 אנגליה", prob:13, odds:"+650", trend:"flat", note:"בית קל" },
-    { rank:4, team:"🇪🇸 ספרד", prob:12, odds:"+450", trend:"down", note:"0–0 קייפ ורדה" },
-    { rank:5, team:"🇦🇷 ארגנטינה", prob:10, odds:"+900", trend:"flat", note:"מסי בן 39" },
-    { rank:6, team:"🇵🇹 פורטוגל", prob:9, odds:"+850", trend:"flat", note:"רונאלדו" },
-  ],
-  results: [],
-  bets: [],
-  analysis: "לחץ על עדכן עכשיו לניתוח עדכני."
-};
+const SEED_STANDINGS = [
+  {rank:1,team:"🇫🇷 צרפת",prob:19,odds:"+500",trend:"up",note:"סגל עמוק"},
+  {rank:2,team:"🇩🇪 גרמניה",prob:14,odds:"+1400",trend:"up",note:"7–1 על קוראסאו"},
+  {rank:3,team:"🏴 אנגליה",prob:13,odds:"+650",trend:"flat",note:"בית קל"},
+  {rank:4,team:"🇪🇸 ספרד",prob:12,odds:"+450",trend:"down",note:"0–0 קייפ ורדה"},
+  {rank:5,team:"🇦🇷 ארגנטינה",prob:10,odds:"+900",trend:"flat",note:"מסי בן 39"},
+  {rank:6,team:"🇵🇹 פורטוגל",prob:9,odds:"+850",trend:"flat",note:"רונאלדו"},
+];
 
 export default function Page() {
-  const [tab, setTab] = useState("standings");
-  const [data, setData] = useState(SEED);
+  const [tab, setTab] = useState("win");
+  const [fixtures, setFixtures] = useState(null);
+  const [analysis, setAnalysis] = useState(null);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(null);
   const [fromCache, setFromCache] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState("טוען...");
+  const [provider, setProvider] = useState("");
 
-  // Load from localStorage on mount
+  // Load cache on mount
   useEffect(() => {
     try {
-      const cached = localStorage.getItem(CACHE_KEY);
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (parsed?.standings?.length > 0) {
-          setData(parsed);
-          setFromCache(true);
-        }
+      const c = localStorage.getItem(CACHE_KEY);
+      if (c) {
+        const p = JSON.parse(c);
+        if (p.fixtures) { setFixtures(p.fixtures); setFromCache(true); }
+        if (p.analysis) { setAnalysis(p.analysis); setLastUpdated(p.analysis.lastUpdated||""); setProvider(p.analysis.provider||""); }
       }
-    } catch(e) {}
+    } catch {}
   }, []);
 
   const refresh = useCallback(async () => {
     setLoading(true); setError(null); setFromCache(false);
     try {
-      const res = await fetch("/api/analyze", { method: "POST" });
-      const fresh = await res.json();
-      if (fresh.error) { setError(fresh.error + " מוצגים הנתונים האחרונים."); return; }
-      setData(fresh);
-      // Save to localStorage
-      try { localStorage.setItem(CACHE_KEY, JSON.stringify(fresh)); } catch(e) {}
-    } catch { setError("לא הצלחתי לטעון נתונים עדכניים. מוצגים הנתונים האחרונים."); }
-    finally { setLoading(false); }
+      // Step 1: Fetch live fixtures (fast, no AI)
+      const fRes = await fetch("/api/fixtures");
+      const fData = await fRes.json();
+      if (fData.error) throw new Error(fData.error);
+      setFixtures(fData);
+
+      // Step 2: AI analysis with fixtures data
+      const aRes = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          results: fData.results || [],
+          upcoming: fData.upcoming || [],
+          groups: fData.groups || [],
+          currentStage: fData.currentStage || "שלב הבתים"
+        })
+      });
+      const aData = await aRes.json();
+      if (aData.error) { setError(aData.error + " מוצגים הנתונים האחרונים."); }
+      else {
+        setAnalysis(aData);
+        setLastUpdated(aData.lastUpdated || "");
+        setProvider(aData.provider || "");
+        try { localStorage.setItem(CACHE_KEY, JSON.stringify({ fixtures: fData, analysis: aData })); } catch {}
+      }
+    } catch(e) {
+      setError(e.message || "שגיאה בטעינה. נסה שוב.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   const loadMoreBets = useCallback(async () => {
     setLoadingMore(true);
     try {
-      const res = await fetch("/api/analyze", { method: "POST" });
-      const fresh = await res.json();
+      const aRes = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          results: fixtures?.results || [],
+          upcoming: fixtures?.upcoming || [],
+          groups: fixtures?.groups || [],
+          currentStage: fixtures?.currentStage || "שלב הבתים"
+        })
+      });
+      const fresh = await aRes.json();
       if (fresh.error || !fresh.bets) throw new Error("no bets");
-      const existingMatches = new Set((data.bets || []).map(b => b.match));
-      const newBets = fresh.bets.filter(b => !existingMatches.has(b.match));
-      const merged = newBets.length > 0 ? [...(data.bets||[]), ...newBets] : [...(data.bets||[]), ...fresh.bets];
-      const updated = { ...data, bets: merged };
-      setData(updated);
-      try { localStorage.setItem(CACHE_KEY, JSON.stringify(updated)); } catch(e) {}
-    } catch { } finally { setLoadingMore(false); }
-  }, [data]);
+      const existing = new Set((analysis?.bets||[]).map(b=>b.match));
+      const newBets = fresh.bets.filter(b=>!existing.has(b.match));
+      const merged = newBets.length > 0 ? [...(analysis?.bets||[]), ...newBets] : [...(analysis?.bets||[]), ...fresh.bets];
+      const updated = { ...analysis, bets: merged };
+      setAnalysis(updated);
+      try { localStorage.setItem(CACHE_KEY, JSON.stringify({ fixtures, analysis: updated })); } catch {}
+    } catch {} finally { setLoadingMore(false); }
+  }, [fixtures, analysis]);
 
   useEffect(() => {
-    const id = setInterval(refresh, 60 * 60 * 1000);
+    const id = setInterval(refresh, 60*60*1000);
     return () => clearInterval(id);
   }, [refresh]);
 
-  const confLabel = c => c==="high"?"ביטחון גבוה":c==="medium"?"ביטחון בינוני":"ביטחון נמוך";
+  const cl = c => c==="high"?"ביטחון גבוה":c==="medium"?"ביטחון בינוני":"ביטחון נמוך";
+  const cc = c => c==="high"?"ch":c==="medium"?"cm":"cl";
+
+  // Group schedule by date
+  const scheduleByDay = (fixtures?.schedule || []).reduce((acc, m) => {
+    const key = m.date;
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(m);
+    return acc;
+  }, {});
+
+  // Determine winner for bracket
+  const getWinner = (m) => {
+    if (!m.score) return null;
+    const [h,a] = m.score.split("–").map(Number);
+    if (h > a) return "home";
+    if (a > h) return "away";
+    return "draw";
+  };
+
+  const standings = analysis?.standings || SEED_STANDINGS;
+
+  const TABS = [
+    { id:"win",      label:"📊 סיכויי זכייה" },
+    { id:"results",  label:"⚽ תוצאות" },
+    { id:"schedule", label:"📅 לוח משחקים" },
+    { id:"groups",   label:"🏆 טבלאות בתים" },
+    { id:"bets",     label:"🎯 הימורים" },
+  ];
 
   return (
     <>
-      <style>{styles}</style>
+      <style>{S}</style>
       <div className="app">
 
         <header className="hero">
@@ -297,65 +296,119 @@ export default function Page() {
           <div className="hero-sub">ניתוח אוטומטי · סיכויי זכייה · המלצות הימורים</div>
         </header>
 
-        <div className="refresh-bar">
+        <div className="rbar">
           <div>
-            <span className="refresh-status">עדכון: <strong>{data.lastUpdated}</strong></span>
-            {fromCache && <span className="cached-badge" style={{marginRight:8}}>מטמון</span>}
+            {fromCache && <span className="cbadge">מטמון</span>}
+            <span className="rstatus">עדכון: <strong>{lastUpdated || "—"}</strong></span>
           </div>
-          <button className="refresh-btn" onClick={refresh} disabled={loading}>
-            {loading ? <><div className="spinner"/>מעדכן...</> : <><div className="live-dot"/>עדכן עכשיו</>}
+          <button className="rbtn" onClick={refresh} disabled={loading}>
+            {loading ? <><div className="spinner"/>מעדכן...</> : <><div className="ldot"/>עדכן עכשיו</>}
           </button>
         </div>
 
-        {error && <div className="error-box">{error}</div>}
+        {error && <div className="err">{error}</div>}
 
         <div className="tabs">
-          {[{id:"standings",label:"📊 סיכויי זכייה"},{id:"results",label:"⚽ תוצאות"},{id:"bets",label:"🎯 הימורים"}]
-            .map(t => <button key={t.id} className={`tab${tab===t.id?" active":""}`} onClick={()=>setTab(t.id)}>{t.label}</button>)}
+          {TABS.map(t => <button key={t.id} className={`tab${tab===t.id?" active":""}`} onClick={()=>setTab(t.id)}>{t.label}</button>)}
         </div>
 
         <div className="content">
 
-          {tab === "standings" && (
+          {/* ── WIN PROBABILITY ── */}
+          {tab === "win" && (
             <div className="card">
-              <div className="card-title">📊 סיכויי זכייה</div>
-              <table className="standings">
+              <div className="ctitle">📊 סיכויי זכייה</div>
+              <table className="wtable">
                 <thead><tr><th>#</th><th>נבחרת</th><th>הסתברות</th><th>אודס</th><th>טרנד</th></tr></thead>
                 <tbody>
-                  {data.standings?.map(s => (
+                  {standings.map(s => (
                     <tr key={s.rank}>
-                      <td><span className={`rank-badge rank-${s.rank}`}>{s.rank}</span></td>
+                      <td><span className={`rbadge rb${s.rank}`}>{s.rank}</span></td>
                       <td style={{fontWeight:700,fontSize:14}}>{s.team}</td>
-                      <td><div className="prob-bar-wrap"><div className="prob-bar-bg"><div className="prob-bar-fill" style={{width:`${Math.min(s.prob*4,100)}%`}}/></div><span className="prob-text">{s.prob}%</span></div></td>
+                      <td><div className="pbar-wrap"><div className="pbar-bg"><div className="pbar-fill" style={{width:`${Math.min(s.prob*4,100)}%`}}/></div><span className="ptext">{s.prob}%</span></div></td>
                       <td style={{fontFamily:"'JetBrains Mono',monospace",fontSize:13,fontWeight:700,color:s.rank===1?"var(--gold2)":"var(--muted)"}}>{s.odds}</td>
                       <td><span className={`trend trend-${s.trend}`}>{s.trend==="up"?"↑":s.trend==="down"?"↓":"→"} {s.note}</span></td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-              {data.analysis && (
-                <div className="analysis-box">
-                  <div className="analysis-label">ניתוח עדכני</div>
-                  <p className="analysis-text">{data.analysis}</p>
+              {analysis?.analysis && (
+                <div className="abox">
+                  <div className="alabel">ניתוח עדכני</div>
+                  <p className="atext">{analysis.analysis}</p>
                 </div>
               )}
             </div>
           )}
 
+          {/* ── RESULTS ── */}
           {tab === "results" && (
             <div className="card">
-              <div className="card-title">⚽ תוצאות — {data.currentStage || "שלב הבתים"}</div>
-              {(!data.results || data.results.length === 0) ? (
-                <p style={{color:"var(--muted)",fontSize:13,textAlign:"center",padding:"24px 0"}}>לחץ "עדכן עכשיו" לטעינת תוצאות</p>
+              <div className="ctitle">⚽ תוצאות — {fixtures?.currentStage || "שלב הבתים"}</div>
+              {!fixtures?.results?.length ? (
+                <p className="empty">לחץ "עדכן עכשיו" לטעינת תוצאות</p>
               ) : (
-                <div className="results-grid">
-                  {data.results.map((r,i) => (
-                    <div key={i} className="result-item">
-                      <div className="result-group">{r.group}</div>
-                      <div className="result-home">{r.home}</div>
-                      <div className="result-score">{r.score}</div>
-                      <div className="result-away">{r.away}</div>
-                      {r.note && <div className="result-note">{r.note}</div>}
+                <div className="rgrid">
+                  {fixtures.results.map((r,i) => (
+                    <div key={i} className="ritem">
+                      <div className="rgroup">{r.group || r.stage}</div>
+                      <div className="rhome">{r.home}</div>
+                      <div className="rscore">{r.score}</div>
+                      <div className="raway">{r.away}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {/* Knockout bracket if available */}
+              {fixtures?.knockoutMatches?.length > 0 && (
+                <>
+                  <div className="ctitle" style={{marginTop:20}}>🏆 שלב הנוקאאוט</div>
+                  {["שמינית גמר","רבע גמר","חצי גמר","מקום שלישי","גמר"].map(stage => {
+                    const ms = fixtures.knockoutMatches.filter(m=>m.stage===stage && m.score);
+                    if (!ms.length) return null;
+                    return (
+                      <div key={stage} className="bracket-stage">
+                        <div className="bracket-stage-title">{stage}</div>
+                        {ms.map((m,i) => {
+                          const w = getWinner(m);
+                          return (
+                            <div key={i} className="bracket-match">
+                              <span className={`bteam${w==="home"?" winner":""}`}>{m.home}</span>
+                              <span className="bscore">{m.score}</span>
+                              <span className={`bteam${w==="away"?" winner":""}`} style={{textAlign:"left"}}>{m.away}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })}
+                </>
+              )}
+            </div>
+          )}
+
+          {/* ── SCHEDULE ── */}
+          {tab === "schedule" && (
+            <div className="card">
+              <div className="ctitle">📅 לוח משחקים קרובים</div>
+              {!fixtures?.schedule?.length ? (
+                <p className="empty">לחץ "עדכן עכשיו" לטעינת לוח המשחקים</p>
+              ) : (
+                <div className="slist">
+                  {Object.entries(scheduleByDay).map(([date, matches]) => (
+                    <div key={date}>
+                      <div className="sday-header">📅 {matches[0].day} · {date}</div>
+                      {matches.map((m,i) => (
+                        <div key={i} className="smatch">
+                          <div style={{flex:1}}>
+                            <div className="smatch-teams">
+                              {m.home} <span className="smatch-vs">נגד</span> {m.away}
+                            </div>
+                            <div className="smatch-group">{m.group || m.stage}</div>
+                          </div>
+                          <div className="smatch-time">{m.time}</div>
+                        </div>
+                      ))}
                     </div>
                   ))}
                 </div>
@@ -363,37 +416,88 @@ export default function Page() {
             </div>
           )}
 
+          {/* ── GROUP STANDINGS ── */}
+          {tab === "groups" && (
+            <div className="card">
+              <div className="ctitle">🏆 טבלאות הבתים</div>
+              {!fixtures?.groups?.length ? (
+                <p className="empty">לחץ "עדכן עכשיו" לטעינת הטבלאות</p>
+              ) : (
+                fixtures.groups.map((g,gi) => (
+                  <div key={gi} className="group-section">
+                    <div className="group-title">{g.group}</div>
+                    <table className="gtable">
+                      <thead>
+                        <tr>
+                          <th>קבוצה</th>
+                          <th>מ'</th>
+                          <th>נ'</th>
+                          <th>ת'</th>
+                          <th>ה'</th>
+                          <th>שע"מ</th>
+                          <th>נק'</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {g.table.map((t,ti) => (
+                          <tr key={ti} className={t.qualified?"qualified":""}>
+                            <td>
+                              {t.qualified && <span className="qual-dot"/>}
+                              {t.team}
+                            </td>
+                            <td>{t.played}</td>
+                            <td>{t.won}</td>
+                            <td>{t.drawn}</td>
+                            <td>{t.lost}</td>
+                            <td className={t.gd>0?"gd-pos":t.gd<0?"gd-neg":""}>{t.gd>0?"+":""}{t.gd}</td>
+                            <td style={{fontWeight:700}}>{t.pts}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ))
+              )}
+              {fixtures?.groups?.length > 0 && (
+                <p style={{fontSize:11,color:"var(--muted)",marginTop:8,textAlign:"right"}}>
+                  ● נקודה ירוקה = עברה לשלב הבא (שתי הראשונות בכל בית)
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* ── BETS ── */}
           {tab === "bets" && (
             <div className="card">
-              <div className="card-title">🎯 המלצות הימורים</div>
-              {data.currentStage && <div className="stage-badge">⚽ {data.currentStage}</div>}
-              {(!data.bets || data.bets.length === 0) ? (
-                <p style={{color:"var(--muted)",fontSize:13,textAlign:"center",padding:"24px 0"}}>לחץ "עדכן עכשיו" לקבלת המלצות</p>
+              <div className="ctitle">🎯 המלצות הימורים</div>
+              {fixtures?.currentStage && <div className="sbadge">⚽ {fixtures.currentStage}</div>}
+              {!analysis?.bets?.length ? (
+                <p className="empty">לחץ "עדכן עכשיו" לקבלת המלצות</p>
               ) : (
-                <div className="bet-list">
-                  {data.bets.map((b,i) => (
-                    <div key={i} className={`bet-item ${b.confidence}`}>
-                      <div className="bet-header">
-                        <span className="bet-match">{b.match}</span>
-                        <span className={`bet-confidence conf-${b.confidence}`}>{confLabel(b.confidence)}</span>
+                <div className="blist">
+                  {analysis.bets.map((b,i) => (
+                    <div key={i} className={`bitem ${b.confidence}`}>
+                      <div className="bhdr">
+                        <span className="bmatch">{b.match}</span>
+                        <span className={`bconf ${cc(b.confidence)}`}>{cl(b.confidence)}</span>
                       </div>
-                      {b.datetime && <div className="bet-time">🕐 {b.datetime}</div>}
-                      <div className="bet-pick">✓ {b.pick}</div>
-                      <div className="bet-reason">{b.reason}</div>
-                      {b.odds && <span className="bet-odds">אודס: {b.odds}</span>}
+                      {b.datetime && <div className="btime">🕐 {b.datetime}</div>}
+                      <div className="bpick">✓ {b.pick}</div>
+                      <div className="breason">{b.reason}</div>
+                      {b.odds && <span className="bodds">אודס: {b.odds}</span>}
                     </div>
                   ))}
                 </div>
               )}
-              <button className="load-more-btn" onClick={loadMoreBets} disabled={loadingMore}>
-                {loadingMore ? "⏳ טוען..." : "➕ טען עוד המלצות"}
+              <button className="lmbtn" onClick={loadMoreBets} disabled={loadingMore}>
+                {loadingMore?"⏳ טוען...":"➕ טען עוד המלצות"}
               </button>
-              <div className="disclaimer">⚠️ להנאה בין חברים בלבד · לא ייעוץ פיננסי</div>
+              <div className="disc">⚠️ להנאה בין חברים בלבד · לא ייעוץ פיננסי</div>
             </div>
           )}
 
-          <div className="timestamp">
-            מופעל על ידי {data.provider==="groq"?"Groq (Llama)":"Gemini (Google)"} + football-data.org · לחץ עדכן לרענון
+          <div className="ts">
+            מופעל על ידי {provider==="groq"?"Groq (Llama)":"Gemini (Google)"} + football-data.org · לחץ עדכן לרענון
           </div>
         </div>
       </div>

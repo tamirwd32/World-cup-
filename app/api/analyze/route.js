@@ -1,7 +1,6 @@
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-// Sanitize team names to avoid breaking JSON in AI prompts
 function safe(name) {
   return (name || "").replace(/"/g, "'").replace(/\\/g, "");
 }
@@ -14,7 +13,7 @@ async function callGemini(key, prompt) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.2, maxOutputTokens: 2000 }
+        generationConfig: { temperature: 0.3, maxOutputTokens: 2500 }
       })
     }
   );
@@ -31,11 +30,11 @@ async function callGroq(key, prompt) {
     body: JSON.stringify({
       model: "llama-3.3-70b-versatile",
       messages: [
-        { role: "system", content: "You are a JSON-only API. Output a single valid JSON object. No markdown, no backticks, no text outside the JSON." },
+        { role: "system", content: "You are a sports analyst API. You MUST respond with ONLY a valid JSON object. Never use placeholder text like 'Hebrew note' or 'short reason' - always write actual Hebrew content. Never copy the example structure literally." },
         { role: "user", content: prompt }
       ],
-      temperature: 0.2,
-      max_tokens: 2000
+      temperature: 0.3,
+      max_tokens: 2500
     })
   });
   const data = await res.json();
@@ -48,7 +47,7 @@ function parseJSON(text) {
   try { return JSON.parse(clean); }
   catch {
     const m = clean.match(/\{[\s\S]*\}/);
-    if (!m) throw new Error("No JSON found in response");
+    if (!m) throw new Error("No JSON found");
     return JSON.parse(m[0]);
   }
 }
@@ -62,52 +61,55 @@ export async function POST(req) {
 
   const { results=[], upcoming=[], groups=[], currentStage="שלב הבתים" } = fixturesData;
 
-  // Sanitize all team names to avoid JSON-breaking characters
   const resultsText = results.length > 0
     ? results.slice(0,12).map(r=>`${safe(r.home)} ${r.score} ${safe(r.away)} (${r.group})`).join(", ")
     : "No results yet";
 
   const upcomingText = upcoming.length > 0
-    ? upcoming.map(u=>`${safe(u.home)} vs ${safe(u.away)} - ${u.datetime}`).join("\n")
+    ? upcoming.map((u,i)=>`${i+1}. ${safe(u.home)} vs ${safe(u.away)} at ${u.datetime}`).join("\n")
     : "No upcoming fixtures";
 
   const standingsText = groups.length > 0
-    ? groups.map(g=>
-        `${g.group}: ` + g.table.map(t=>`${safe(t.team)} ${t.pts}pts (${t.played}G)`).join(", ")
+    ? groups.slice(0,6).map(g=>
+        `${g.group}: ` + g.table.slice(0,4).map(t=>`${safe(t.team)} ${t.pts}pts`).join(", ")
       ).join(" | ")
     : "Not available";
 
-  const prompt = `You are a World Cup 2026 analyst. Analyze this REAL live data:
+  const prompt = `You are a World Cup 2026 football analyst. Analyze the real live data below and respond with a JSON object.
 
-RESULTS: ${resultsText}
-UPCOMING FIXTURES: ${upcomingText}
-STANDINGS: ${standingsText}
-STAGE: ${currentStage}
+=== REAL DATA ===
+RESULTS SO FAR: ${resultsText}
+CURRENT STAGE: ${currentStage}
+GROUP STANDINGS: ${standingsText}
 
-Return ONLY a valid JSON object. No markdown, no backticks, nothing else before or after.
-IMPORTANT: Team names must NOT contain double-quote characters. Use single quotes or Hebrew only.
+UPCOMING FIXTURES (create one bet for EACH of these):
+${upcomingText}
 
-{
-  "lastUpdated": "16.6.2026 - יום 6",
-  "standings": [
-    {"rank":1,"team":"צרפת","prob":19,"odds":"+500","trend":"up","note":"סגל עמוק"},
-    {"rank":2,"team":"גרמניה","prob":14,"odds":"+1400","trend":"up","note":"7-1 על קוראסאו"},
-    {"rank":3,"team":"אנגליה","prob":13,"odds":"+650","trend":"flat","note":"בית קל"},
-    {"rank":4,"team":"ספרד","prob":12,"odds":"+450","trend":"down","note":"0-0 קייפ ורדה"},
-    {"rank":5,"team":"ארגנטינה","prob":10,"odds":"+900","trend":"flat","note":"מסי בן 39"},
-    {"rank":6,"team":"פורטוגל","prob":9,"odds":"+850","trend":"flat","note":"רונאלדו"}
-  ],
-  "bets": [
-    {"match":"קבוצה א - קבוצה ב","datetime":"שעה מדויקת מהנתונים","pick":"תחזית מדויקת עם תוצאה למשל צרפת מנצחת 2:0","confidence":"high","odds":"~2.10","reason":"נימוק קצר בעברית"}
-  ],
-  "analysis": "2-3 משפטים בעברית על תובנות מרכזיות"
-}
+=== INSTRUCTIONS ===
+Return a JSON object with these exact fields:
 
-Rules:
-- standings: top 6 with flag emojis in team names (use Unicode, not ASCII quotes)
-- bets: one per upcoming fixture, exact datetime from data above
-- analysis: based on real results
-- CRITICAL: no double-quote marks inside any JSON string values`;
+1. "lastUpdated": today's Hebrew date string, e.g. "16.6.2026 - יום 6"
+
+2. "standings": array of exactly 6 objects, one per top title contender.
+   Each object: rank (1-6), team (Hebrew name with flag emoji), prob (win percentage integer), odds (e.g. "+500"), trend ("up"/"down"/"flat"), note (real Hebrew insight, max 35 chars)
+   Base this on actual results - teams that won should trend up.
+
+3. "bets": array with ONE object per upcoming fixture listed above.
+   Each object: 
+   - match: "Hebrew team 1 - Hebrew team 2"
+   - datetime: exact datetime from the fixtures list above
+   - pick: your specific prediction in Hebrew including exact score, e.g. "צרפת מנצחת 2:1"
+   - confidence: "high", "medium", or "low" based on your analysis
+   - odds: estimated bookmaker odds like "~1.85"
+   - reason: 1-2 sentences of REAL Hebrew analysis explaining why (NOT placeholder text)
+
+4. "analysis": 2-3 sentences of real Hebrew insight about the tournament so far.
+
+=== CRITICAL RULES ===
+- Write REAL content, not placeholder text like "נימוק קצר" or "short reason"
+- Every bet must have a different match from the fixtures list
+- Do not include double-quote characters inside string values
+- Return ONLY the JSON object, nothing else`;
 
   let text = "";
   let provider = "unknown";
@@ -127,6 +129,15 @@ Rules:
   try {
     const parsed = parseJSON(text);
     if (!parsed.standings) throw new Error("Invalid shape - missing standings");
+    // Validate bets have real content
+    if (parsed.bets) {
+      parsed.bets = parsed.bets.filter(b =>
+        b.match && b.pick && b.reason &&
+        !b.reason.includes("נימוק") &&
+        !b.reason.includes("short") &&
+        !b.reason.includes("Hebrew")
+      );
+    }
     return Response.json({ ...parsed, provider }, { headers: { "Cache-Control": "no-store" } });
   } catch(e) {
     return Response.json({ error: "שגיאה בניתוח: " + e.message }, { status: 502 });

@@ -174,6 +174,9 @@ export default function Page() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(null);
   const [fromCache, setFromCache] = useState(false);
+  const [modal, setModal] = useState(null); // { bet: betObject }
+  const [modalData, setModalData] = useState(null);
+  const [modalLoading, setModalLoading] = useState(false);
   const [lastUpdated, setLastUpdated] = useState("טוען...");
   const [provider, setProvider] = useState("");
 
@@ -252,6 +255,32 @@ export default function Page() {
       try { localStorage.setItem(CACHE_KEY, JSON.stringify({ fixtures, analysis: updated })); } catch {}
     } catch {} finally { setLoadingMore(false); }
   }, [fixtures, analysis]);
+
+  const openModal = useCallback(async (bet) => {
+    setModal(bet);
+    setModalData(null);
+    setModalLoading(true);
+    try {
+      const res = await fetch("/api/match-analysis", {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({
+          home: bet.match.split(" - ")[0]?.replace(/^[\uD800-\uDBFF][\uDC00-\uDFFF]\s*/,"").trim() || bet.match,
+          away: bet.match.split(" - ")[1]?.replace(/^[\uD800-\uDBFF][\uDC00-\uDFFF]\s*/,"").trim() || "",
+          datetime: bet.datetime || "",
+          mainPick: bet.pick || "",
+          recentResults: (fixtures?.results||[]).slice(0,6).map(r=>`${r.home} ${r.score} ${r.away}`).join(", ")
+        })
+      });
+      const data = await res.json();
+      if (!data.error) setModalData(data);
+      else setModalData({ error: data.error });
+    } catch(e) {
+      setModalData({ error: e.message });
+    } finally {
+      setModalLoading(false);
+    }
+  }, [fixtures]);
 
   useEffect(() => {
     const id = setInterval(refresh, 60*60*1000);
@@ -490,6 +519,7 @@ export default function Page() {
                       <div className="bpick">✓ {b.pick}</div>
                       <div className="breason">{b.reason}</div>
                       {b.odds && <span className="bodds">אודס: {b.odds}</span>}
+                      <button className="detail-btn" onClick={()=>openModal(b)}>🔍 לניתוח המלא</button>
                     </div>
                   ))}
                 </div>
@@ -498,6 +528,90 @@ export default function Page() {
                 {loadingMore?"⏳ טוען...":"➕ טען עוד המלצות"}
               </button>
               <div className="disc">⚠️ להנאה בין חברים בלבד · לא ייעוץ פיננסי</div>
+            </div>
+          )}
+
+          {/* ── MATCH DETAIL MODAL ── */}
+          {modal && (
+            <div className="modal-overlay" onClick={(e)=>{if(e.target.classList.contains("modal-overlay")){setModal(null);setModalData(null);}}}>
+              <div className="modal">
+                <div className="modal-handle"/>
+                <div className="modal-header">
+                  <div className="modal-title">{modal.match}</div>
+                  <button className="modal-close" onClick={()=>{setModal(null);setModalData(null);}}>✕</button>
+                </div>
+
+                {/* Main pick */}
+                <div className="modal-section">
+                  <div className="modal-section-title">המלצה ראשית</div>
+                  <div className="bpick" style={{fontSize:24}}>✓ {modal.pick}</div>
+                  {modal.datetime && <div className="btime" style={{marginTop:6}}>🕐 {modal.datetime}</div>}
+                </div>
+
+                {modalLoading && <div className="modal-spinner">🔄 טוען ניתוח מעמיק...</div>}
+
+                {modalData?.error && <div className="err">{modalData.error}</div>}
+
+                {modalData && !modalData.error && (
+                  <>
+                    {/* Deep analysis */}
+                    <div className="modal-section">
+                      <div className="modal-section-title">ניתוח מעמיק</div>
+                      <p className="modal-analysis">{modalData.mainAnalysis}</p>
+                    </div>
+
+                    {/* Key factors */}
+                    {modalData.mainFactors?.length > 0 && (
+                      <div className="modal-section">
+                        <div className="modal-section-title">גורמים מכריעים</div>
+                        <div className="modal-factors">
+                          {modalData.mainFactors.map((f,i)=>(
+                            <div key={i} className="modal-factor">{f}</div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Key player */}
+                    {modalData.keyPlayer && (
+                      <div className="modal-section">
+                        <div className="modal-section-title">שחקן מפתח</div>
+                        <div className="modal-kp">
+                          <div className="modal-kp-name">⭐ {modalData.keyPlayer.name} — {modalData.keyPlayer.team}</div>
+                          <div className="modal-kp-reason">{modalData.keyPlayer.reason}</div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Risk */}
+                    {modalData.riskLevel && (
+                      <div className="modal-section">
+                        <div className="modal-section-title">רמת סיכון</div>
+                        <span className={`modal-risk risk-${modalData.riskLevel}`}>
+                          {modalData.riskLevel==="low"?"🟢 סיכון נמוך":modalData.riskLevel==="medium"?"🟡 סיכון בינוני":"🔴 סיכון גבוה"}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Alternatives */}
+                    {modalData.alternatives?.length > 0 && (
+                      <div className="modal-section">
+                        <div className="modal-section-title">תוצאות חלופיות</div>
+                        {modalData.alternatives.map((a,i)=>(
+                          <div key={i} className="modal-alt">
+                            <div className="modal-alt-pick">{a.pick}</div>
+                            <div className="modal-alt-meta">
+                              {a.probability && <span className="modal-alt-prob">{a.probability}</span>}
+                              {a.odds && <span className="modal-alt-odds">אודס: {a.odds}</span>}
+                            </div>
+                            <div className="modal-alt-reason">{a.reason}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
           )}
 

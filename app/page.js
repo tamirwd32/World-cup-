@@ -651,9 +651,16 @@ export default function Page() {
                       </div>
                       {b.datetime && <div className="btime">🕐 {b.datetime}</div>}
                       <div className="bpick">✓ {b.pick}</div>
-                      <div className="breason">{b.reason}</div>
-                      {b.odds && <span className="bodds">אודס: {b.odds}</span>}
-                      <button className="detail-btn" onClick={()=>openModal(b)}>🔍 לניתוח המלא</button>
+                      <div className="breason">{b.reason?.split(".")[0]}.</div>
+                      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginTop:10,gap:8}}>
+                        {b.odds && <span className="bodds">אודס: {b.odds}</span>}
+                        <button
+                          onClick={()=>openModal(b)}
+                          style={{padding:"6px 14px",background:"linear-gradient(135deg,var(--g2),var(--g3))",color:"#fff",border:"none",borderRadius:20,fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:5,boxShadow:"0 2px 6px rgba(26,124,62,.3)",whiteSpace:"nowrap"}}
+                        >
+                          🔍 ניתוח מלא
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>

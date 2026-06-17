@@ -186,6 +186,34 @@ const S = `
     .wtable th:nth-child(4),.wtable td:nth-child(4){display:none;}
     .gtable th:nth-child(6),.gtable td:nth-child(6){display:none;}
   }
+
+  /* Modal */
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:200;display:flex;align-items:flex-end;justify-content:center;backdrop-filter:blur(3px);}
+  .modal{background:#fff;border-radius:20px 20px 0 0;padding:24px 20px 48px;width:100%;max-width:600px;max-height:88vh;overflow-y:auto;}
+  .modal-handle{width:36px;height:4px;background:#e5e7eb;border-radius:2px;margin:0 auto 16px;}
+  .modal-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;}
+  .modal-title{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:1px;color:var(--g2);flex:1;padding-left:10px;line-height:1.3;}
+  .modal-close{width:30px;height:30px;border:none;background:#f3f4f6;border-radius:50%;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .modal-sec{margin-bottom:16px;}
+  .modal-sec-title{font-size:10px;font-family:'JetBrains Mono',monospace;letter-spacing:2px;color:var(--g2);text-transform:uppercase;margin-bottom:8px;}
+  .modal-analysis{font-size:13px;line-height:1.8;color:var(--text);}
+  .modal-factors{display:flex;flex-direction:column;gap:6px;}
+  .modal-factor{display:flex;gap:8px;font-size:13px;color:var(--text);}
+  .modal-factor::before{content:"✓";color:var(--g2);font-weight:700;flex-shrink:0;}
+  .modal-alt{background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px;}
+  .modal-alt-pick{font-family:'Bebas Neue',sans-serif;font-size:19px;color:var(--g1);margin-bottom:4px;}
+  .modal-alt-meta{display:flex;gap:8px;margin-bottom:6px;}
+  .modal-alt-prob{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:var(--gold2);background:var(--goldbg);padding:2px 7px;border-radius:4px;}
+  .modal-alt-odds{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:var(--blue);background:#eff6ff;padding:2px 7px;border-radius:4px;}
+  .modal-alt-reason{font-size:12px;color:var(--muted);line-height:1.6;}
+  .modal-kp{background:linear-gradient(135deg,#f0fdf4,#dcfce7);border-radius:10px;padding:12px;}
+  .modal-kp-name{font-weight:700;font-size:14px;color:var(--g1);}
+  .modal-kp-reason{font-size:12px;color:var(--text);margin-top:4px;line-height:1.6;}
+  .modal-risk{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;font-family:'JetBrains Mono',monospace;}
+  .risk-low{background:#d1fae5;color:#065f46;}
+  .risk-medium{background:var(--goldbg);color:#92400e;}
+  .risk-high{background:var(--redbg);color:#991b1b;}
+  .modal-loading{text-align:center;padding:32px;color:var(--muted);font-size:13px;}
 `;
 
 const SEED_STANDINGS = [
@@ -683,28 +711,28 @@ export default function Page() {
                 </div>
 
                 {/* Main pick */}
-                <div className="modal-section">
-                  <div className="modal-section-title">המלצה ראשית</div>
+                <div className="modal-sec">
+                  <div className="modal-sec-title">המלצה ראשית</div>
                   <div className="bpick" style={{fontSize:24}}>✓ {modal.pick}</div>
                   {modal.datetime && <div className="btime" style={{marginTop:6}}>🕐 {modal.datetime}</div>}
                 </div>
 
-                {modalLoading && <div className="modal-spinner">🔄 טוען ניתוח מעמיק...</div>}
+                {modalLoading && <div className="modal-loading">🔄 טוען ניתוח מעמיק...</div>}
 
                 {modalData?.error && <div className="err">{modalData.error}</div>}
 
                 {modalData && !modalData.error && (
                   <>
                     {/* Deep analysis */}
-                    <div className="modal-section">
-                      <div className="modal-section-title">ניתוח מעמיק</div>
+                    <div className="modal-sec">
+                      <div className="modal-sec-title">ניתוח מעמיק</div>
                       <p className="modal-analysis">{modalData.mainAnalysis}</p>
                     </div>
 
                     {/* Key factors */}
                     {modalData.mainFactors?.length > 0 && (
-                      <div className="modal-section">
-                        <div className="modal-section-title">גורמים מכריעים</div>
+                      <div className="modal-sec">
+                        <div className="modal-sec-title">גורמים מכריעים</div>
                         <div className="modal-factors">
                           {modalData.mainFactors.map((f,i)=>(
                             <div key={i} className="modal-factor">{f}</div>
@@ -715,8 +743,8 @@ export default function Page() {
 
                     {/* Key player */}
                     {modalData.keyPlayer && (
-                      <div className="modal-section">
-                        <div className="modal-section-title">שחקן מפתח</div>
+                      <div className="modal-sec">
+                        <div className="modal-sec-title">שחקן מפתח</div>
                         <div className="modal-kp">
                           <div className="modal-kp-name">⭐ {modalData.keyPlayer.name} — {modalData.keyPlayer.team}</div>
                           <div className="modal-kp-reason">{modalData.keyPlayer.reason}</div>
@@ -726,8 +754,8 @@ export default function Page() {
 
                     {/* Risk */}
                     {modalData.riskLevel && (
-                      <div className="modal-section">
-                        <div className="modal-section-title">רמת סיכון</div>
+                      <div className="modal-sec">
+                        <div className="modal-sec-title">רמת סיכון</div>
                         <span className={`modal-risk risk-${modalData.riskLevel}`}>
                           {modalData.riskLevel==="low"?"🟢 סיכון נמוך":modalData.riskLevel==="medium"?"🟡 סיכון בינוני":"🔴 סיכון גבוה"}
                         </span>
@@ -736,8 +764,8 @@ export default function Page() {
 
                     {/* Alternatives */}
                     {modalData.alternatives?.length > 0 && (
-                      <div className="modal-section">
-                        <div className="modal-section-title">תוצאות חלופיות</div>
+                      <div className="modal-sec">
+                        <div className="modal-sec-title">תוצאות חלופיות</div>
                         {modalData.alternatives.map((a,i)=>(
                           <div key={i} className="modal-alt">
                             <div className="modal-alt-pick">{a.pick}</div>

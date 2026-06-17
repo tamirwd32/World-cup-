@@ -138,6 +138,7 @@ export async function GET() {
         home: ht(m.homeTeam.shortName || m.homeTeam.name),
         score: `${m.score.fullTime.home}–${m.score.fullTime.away}`,
         away: ht(m.awayTeam.shortName || m.awayTeam.name),
+        date: m.utcDate,
       }));
 
     // ── Upcoming (next 72h) ──

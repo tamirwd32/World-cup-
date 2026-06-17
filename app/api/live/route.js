@@ -14,12 +14,12 @@ const TEAM_HE = {
   "Iraq":"עיראק","Haiti":"האיטי","Scotland":"סקוטלנד","South Africa":"דרום אפריקה",
   "Egypt":"מצרים","Tunisia":"תוניסיה","Ghana":"גאנה","Saudi Arabia":"ערב הסעודית",
   "Ecuador":"אקוודור","Colombia":"קולומביה","Panama":"פנמה","Uzbekistan":"אוזבקיסטן",
-  "Bosnia and Herzegovina":"בוסניה","Qatar":"קטאר","Denmark":"דנמרק",
+  "Bosnia and Herzegovina":"בוסניה","Qatar":"קטאר",
 };
 
 const STATUS_HE = {
-  "IN_PLAY":"משחק חי","PAUSED":"הפסקה","HALFTIME":"הפסקה","FINISHED":"הסתיים",
-  "TIMED":"לא התחיל","SCHEDULED":"לא התחיל","POSTPONED":"נדחה","SUSPENDED":"מושהה",
+  "IN_PLAY":"⚽ משחק חי","PAUSED":"⏸ הפסקה","HALFTIME":"⏸ הפסקה",
+  "FINISHED":"✅ הסתיים","TIMED":"⏰ לא התחיל","SCHEDULED":"⏰ לא התחיל",
 };
 
 function ht(name) { return TEAM_HE[name] || name; }
@@ -28,56 +28,54 @@ export async function GET() {
   const key = process.env.FOOTBALL_DATA_KEY;
   if (!key) return Response.json({ error: "Missing key" }, { status: 500 });
 
+  const headers = { "X-Auth-Token": key };
+  const BASE = "https://api.football-data.org/v4";
+
   try {
-    const res = await fetch(
-      "https://api.football-data.org/v4/competitions/WC/matches?season=2026&status=IN_PLAY,PAUSED,HALFTIME",
-      { headers: { "X-Auth-Token": key } }
-    );
+    // Fetch ALL WC matches and filter locally — avoids unsupported multi-status param
+    const res = await fetch(`${BASE}/competitions/WC/matches?season=2026`, { headers });
     const data = await res.json();
 
-    // Also fetch matches finishing soon or just finished (last 3 hours)
-    const res2 = await fetch(
-      "https://api.football-data.org/v4/competitions/WC/matches?season=2026&status=FINISHED",
-      { headers: { "X-Auth-Token": key } }
-    );
-    const data2 = await res2.json();
+    if (!res.ok) throw new Error(data.message || "API error " + res.status);
 
-    const liveMatches = (data.matches || []).map(m => ({
-      id: m.id,
-      home: ht(m.homeTeam.shortName || m.homeTeam.name),
-      away: ht(m.awayTeam.shortName || m.awayTeam.name),
-      homeScore: m.score?.fullTime?.home ?? m.score?.halfTime?.home ?? 0,
-      awayScore: m.score?.fullTime?.away ?? m.score?.halfTime?.away ?? 0,
-      minute: m.minute || null,
-      status: m.status,
-      statusHe: STATUS_HE[m.status] || m.status,
-      isLive: ["IN_PLAY","PAUSED","HALFTIME"].includes(m.status),
-    }));
-
-    // Recent finished (last 3 hours)
+    const all = data.matches || [];
     const now = Date.now();
-    const recentFinished = (data2.matches || [])
+
+    // Live right now
+    const liveStatuses = ["IN_PLAY","PAUSED","HALFTIME"];
+    const live = all
+      .filter(m => liveStatuses.includes(m.status))
+      .map(m => ({
+        home: ht(m.homeTeam.shortName || m.homeTeam.name),
+        away: ht(m.awayTeam.shortName || m.awayTeam.name),
+        homeScore: m.score?.fullTime?.home ?? m.score?.halfTime?.home ?? 0,
+        awayScore: m.score?.fullTime?.away ?? m.score?.halfTime?.away ?? 0,
+        minute: m.minute || null,
+        status: m.status,
+        statusHe: STATUS_HE[m.status] || m.status,
+        isLive: true,
+      }));
+
+    // Finished in last 3 hours
+    const recentFinished = all
       .filter(m => {
+        if (m.status !== "FINISHED") return false;
         const t = new Date(m.utcDate).getTime();
         return now - t < 3 * 60 * 60 * 1000;
       })
+      .sort((a,b) => new Date(b.utcDate) - new Date(a.utcDate))
       .map(m => ({
-        id: m.id,
         home: ht(m.homeTeam.shortName || m.homeTeam.name),
         away: ht(m.awayTeam.shortName || m.awayTeam.name),
         homeScore: m.score.fullTime.home,
         awayScore: m.score.fullTime.away,
-        minute: 90,
-        status: "FINISHED",
-        statusHe: "הסתיים",
+        statusHe: "✅ הסתיים",
         isLive: false,
       }));
 
-    const hasLive = liveMatches.length > 0;
-
     return Response.json({
-      hasLive,
-      live: liveMatches,
+      hasLive: live.length > 0,
+      live,
       recentFinished,
       fetchedAt: new Date().toISOString(),
     }, { headers: { "Cache-Control": "no-store" } });

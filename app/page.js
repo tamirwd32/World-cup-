@@ -290,7 +290,8 @@ export default function Page() {
           results: fData.results || [],
           upcoming: fData.upcoming || [],
           groups: fData.groups || [],
-          currentStage: fData.currentStage || "שלב הבתים"
+          currentStage: fData.currentStage || "שלב הבתים",
+          bracket: fData.bracket || {}
         })
       });
       const aData = await aRes.json();
@@ -318,7 +319,8 @@ export default function Page() {
           results: fixtures?.results || [],
           upcoming: fixtures?.upcoming || [],
           groups: fixtures?.groups || [],
-          currentStage: fixtures?.currentStage || "שלב הבתים"
+          currentStage: fixtures?.currentStage || "שלב הבתים",
+          bracket: fixtures?.bracket || {}
         })
       });
       const fresh = await aRes.json();

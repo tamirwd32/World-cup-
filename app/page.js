@@ -182,6 +182,25 @@ const S = `
   .ts{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);text-align:center;margin-top:20px;}
   .cbadge{font-size:11px;color:var(--gold2);background:var(--goldbg);padding:2px 8px;border-radius:4px;font-family:'JetBrains Mono',monospace;margin-right:8px;}
 
+  /* Bracket */
+  .bracket-stage{margin-bottom:24px;}
+  .bracket-stage-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+  .bracket-stage-title{font-family:"Bebas Neue",sans-serif;font-size:20px;letter-spacing:1px;color:var(--g1);}
+  .bracket-stage-meta{font-family:"JetBrains Mono",monospace;font-size:11px;color:var(--muted);}
+  .bracket-match{display:flex;align-items:stretch;background:#fff;border:1px solid var(--border);border-radius:12px;margin-bottom:8px;overflow:hidden;}
+  .bracket-match.live-match{border-color:#fecaca;background:#fff8f8;}
+  .bracket-match.upcoming{background:var(--card2);border-style:dashed;}
+  .bracket-side{flex:1;padding:12px 14px;display:flex;flex-direction:column;justify-content:center;}
+  .bracket-side.away{text-align:left;}
+  .bracket-team{font-weight:700;font-size:14px;color:var(--text);}
+  .bracket-team.winner{color:var(--g2);}
+  .bracket-team.loser{color:var(--muted);font-weight:400;}
+  .bracket-center{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 10px;background:var(--card2);min-width:64px;border-left:1px solid var(--border);border-right:1px solid var(--border);}
+  .bracket-score{font-family:"Bebas Neue",sans-serif;font-size:26px;letter-spacing:2px;color:var(--g2);line-height:1;}
+  .bracket-score.live-score{color:var(--red);}
+  .bracket-date{font-family:"JetBrains Mono",monospace;font-size:10px;color:var(--muted);text-align:center;margin-top:3px;white-space:nowrap;}
+  .bracket-live-badge{font-size:10px;font-weight:700;color:var(--red);background:#fee2e2;padding:2px 6px;border-radius:4px;margin-top:3px;}
+
   @media(max-width:600px){
     .wtable th:nth-child(4),.wtable td:nth-child(4){display:none;}
     .gtable th:nth-child(6),.gtable td:nth-child(6){display:none;}
@@ -397,7 +416,7 @@ export default function Page() {
     { id:"win",      label:"📊 סיכויי זכייה" },
     { id:"results",  label:"⚽ תוצאות" },
     { id:"schedule", label:"📅 לוח משחקים" },
-    { id:"groups",   label:"🏆 טבלאות בתים" },
+    { id:"bracket", label:"🏆 מצב הגביע" },
     { id:"bets",     label:"🎯 הימורים" },
   ];
 
@@ -613,51 +632,78 @@ export default function Page() {
           )}
 
           {/* ── GROUP STANDINGS ── */}
-          {tab === "groups" && (
-            <div className="card">
-              <div className="ctitle">🏆 טבלאות הבתים</div>
-              {!fixtures?.groups?.length ? (
-                <p className="empty">לחץ "עדכן עכשיו" לטעינת הטבלאות</p>
-              ) : (
-                fixtures.groups.map((g,gi) => (
-                  <div key={gi} className="group-section">
-                    <div className="group-title">{g.group}</div>
-                    <table className="gtable">
-                      <thead>
-                        <tr>
-                          <th>קבוצה</th>
-                          <th>מ'</th>
-                          <th>נ'</th>
-                          <th>ת'</th>
-                          <th>ה'</th>
-                          <th>שע"מ</th>
-                          <th>נק'</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {g.table.map((t,ti) => (
-                          <tr key={ti} className={t.qualified?"qualified":""}>
-                            <td>
-                              {t.qualified && <span className="qual-dot"/>}
-                              {t.team}
-                            </td>
-                            <td>{t.played}</td>
-                            <td>{t.won}</td>
-                            <td>{t.drawn}</td>
-                            <td>{t.lost}</td>
-                            <td className={t.gd>0?"gd-pos":t.gd<0?"gd-neg":""}>{t.gd>0?"+":""}{t.gd}</td>
-                            <td style={{fontWeight:700}}>{t.pts}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ))
-              )}
+          {tab === "bracket" && (
+            <div>
+              <div className="card">
+                <div className="ctitle">🏆 מצב הגביע — {fixtures?.currentStage || "..."}</div>
+                {!fixtures?.bracket ? (
+                  <p className="empty">לחץ "עדכן עכשיו" לטעינת מצב הגביע</p>
+                ) : (
+                  ["LAST_32","LAST_16","QUARTER_FINALS","SEMI_FINALS","THIRD_PLACE","FINAL"]
+                    .filter(stage => fixtures.bracket[stage])
+                    .map(stage => {
+                      const s = fixtures.bracket[stage];
+                      return (
+                        <div key={stage} className="bracket-stage">
+                          <div className="bracket-stage-header">
+                            <div className="bracket-stage-title">{s.label}</div>
+                            <div className="bracket-stage-meta">
+                              {s.finished}/{s.total} הסתיימו
+                              {s.live > 0 && <span style={{color:"var(--red)",marginRight:6}}>● חי</span>}
+                            </div>
+                          </div>
+                          {s.matches.map((m,i) => (
+                            <div key={i} className={`bracket-match${m.isLive?" live-match":m.isTimed?" upcoming":""}`}>
+                              <div className="bracket-side">
+                                <div className={`bracket-team${m.homeWon?" winner":m.awayWon?" loser":""}`}>{m.home}</div>
+                              </div>
+                              <div className="bracket-center">
+                                {m.isFinished || m.isLive ? (
+                                  <>
+                                    <div className={`bracket-score${m.isLive?" live-score":""}`}>
+                                      {m.homeScore ?? "–"}:{m.awayScore ?? "–"}
+                                    </div>
+                                    {m.isLive && <div className="bracket-live-badge">● חי</div>}
+                                  </>
+                                ) : (
+                                  <div className="bracket-score" style={{fontSize:14,color:"var(--muted)"}}>נגד</div>
+                                )}
+                                <div className="bracket-date">{m.date}</div>
+                              </div>
+                              <div className="bracket-side away">
+                                <div className={`bracket-team${m.awayWon?" winner":m.homeWon?" loser":""}`}>{m.away}</div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })
+                )}
+              </div>
+
+              {/* Group standings (collapsible) */}
               {fixtures?.groups?.length > 0 && (
-                <p style={{fontSize:11,color:"var(--muted)",marginTop:8,textAlign:"right"}}>
-                  ● נקודה ירוקה = עברה לשלב הבא (שתי הראשונות בכל בית)
-                </p>
+                <div className="card">
+                  <div className="ctitle" style={{marginBottom:8}}>📋 טבלאות הבתים (שלב הסתיים)</div>
+                  {fixtures.groups.map((g,gi) => (
+                    <div key={gi} className="group-section">
+                      <div className="group-title">{g.group}</div>
+                      <table className="gtable">
+                        <thead><tr><th>קבוצה</th><th>מ'</th><th>נ'</th><th>ת'</th><th>ה'</th><th>שע"מ</th><th>נק'</th></tr></thead>
+                        <tbody>
+                          {g.table.map((t,ti) => (
+                            <tr key={ti} className={t.qualified?"qualified":""}>
+                              <td>{t.qualified && <span className="qual-dot"/>}{t.team}</td>
+                              <td>{t.played}</td><td>{t.won}</td><td>{t.drawn}</td><td>{t.lost}</td>
+                              <td className={t.gd>0?"gd-pos":t.gd<0?"gd-neg":""}>{t.gd>0?"+":""}{t.gd}</td>
+                              <td style={{fontWeight:700}}>{t.pts}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           )}

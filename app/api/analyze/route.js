@@ -78,7 +78,7 @@ export async function POST(req) {
   let fixturesData={};
   try{fixturesData=await req.json();}catch{}
 
-  const {results=[],upcoming=[],groups=[],currentStage="שלב הבתים"}=fixturesData;
+  const {results=[],upcoming=[],groups=[],currentStage="שלב הבתים",bracket={}}=fixturesData;
 
   const resultsText = results.length>0
     ? results.slice(0,12).map(r=>`${safe(r.home)} ${r.score} ${safe(r.away)} (${r.group})`).join(", ")
@@ -89,6 +89,24 @@ export async function POST(req) {
         `${g.group}: `+g.table.slice(0,4).map(t=>`${safe(t.team)} ${t.pts}pts`).join(", ")
       ).join(" | ")
     : "Not available";
+
+  // Build eliminated/still-in lists from bracket data
+  const eliminated = new Set();
+  const stillIn = new Set();
+  Object.values(bracket).forEach(stage => {
+    (stage.matches || []).forEach(m => {
+      if (m.isFinished) {
+        if (m.homeWon) { stillIn.add(m.home); eliminated.add(m.away); }
+        else if (m.awayWon) { stillIn.add(m.away); eliminated.add(m.home); }
+      }
+    });
+  });
+  const eliminatedText = eliminated.size > 0
+    ? "נפלו מהטורניר (אל תכלול אותן בסיכויי זכייה): " + [...eliminated].join(", ")
+    : "";
+  const stillInText = stillIn.size > 0
+    ? "עדיין בטורניר: " + [...stillIn].join(", ")
+    : "";
 
   // Build explicit bet request for each upcoming match
   const betRequests = upcoming.length>0
@@ -101,7 +119,9 @@ export async function POST(req) {
 
 RESULTS: ${resultsText}
 STAGE: ${currentStage}
-STANDINGS: ${standingsText}
+${eliminatedText}
+${stillInText}
+GROUP STANDINGS: ${standingsText}
 
 UPCOMING MATCHES - you MUST create exactly one bet for EACH match below:
 ${betRequests}
@@ -110,7 +130,7 @@ Return a JSON object with these fields:
 
 "lastUpdated": today Hebrew date e.g. "16.6.2026 - יום 6"
 
-"standings": array of 6 objects:
+"standings": array of 6 objects — ONLY teams still in the tournament (not eliminated):
 - rank: 1 to 6
 - team: Hebrew team name only (no flag, no emoji)
 - prob: integer win probability percentage

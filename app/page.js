@@ -258,6 +258,9 @@ export default function Page() {
   const [liveData, setLiveData] = useState(null);
   const [liveLoading, setLiveLoading] = useState(false);
   const [openAccordions, setOpenAccordions] = useState({});
+  const [teamModal, setTeamModal] = useState(null);
+  const [teamModalData, setTeamModalData] = useState(null);
+  const [teamModalLoading, setTeamModalLoading] = useState(false);
   const [lastUpdated, setLastUpdated] = useState("טוען...");
   const [provider, setProvider] = useState("");
 
@@ -369,6 +372,44 @@ export default function Page() {
     setOpenAccordions(prev => ({...prev, [key]: !prev[key]}));
   };
 
+  const openTeamModal = useCallback(async (teamRow) => {
+    setTeamModal(teamRow);
+    setTeamModalData(null);
+    setTeamModalLoading(true);
+    try {
+      // Extract clean team name (remove flag emoji)
+      const cleanName = (teamRow.team || "").replace(/^[^\u0590-\u05FF]*/, "").trim();
+      // Find this team's results in the tournament
+      const teamResults = (fixtures?.results || [])
+        .filter(r => r.home.includes(cleanName) || r.away.includes(cleanName))
+        .map(r => `${r.home} ${r.score} ${r.away}`)
+        .join(", ");
+      // Find next opponent from upcoming
+      const nextMatch = (fixtures?.upcoming || []).find(u => u.home.includes(cleanName) || u.away.includes(cleanName));
+      const nextOpponent = nextMatch ? `${nextMatch.home} vs ${nextMatch.away} — ${nextMatch.datetime}` : "";
+
+      const res = await fetch("/api/team-analysis", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          team: cleanName,
+          rank: teamRow.rank,
+          prob: teamRow.prob,
+          teamResults,
+          currentStage: fixtures?.currentStage || "",
+          nextOpponent
+        })
+      });
+      const data = await res.json();
+      if (!data.error) setTeamModalData(data);
+      else setTeamModalData({ error: data.error });
+    } catch(e) {
+      setTeamModalData({ error: e.message });
+    } finally {
+      setTeamModalLoading(false);
+    }
+  }, [fixtures]);
+
   const fetchLive = useCallback(async () => {
     setLiveLoading(true);
     try {
@@ -461,9 +502,12 @@ export default function Page() {
                 <thead><tr><th>#</th><th>נבחרת</th><th>הסתברות</th><th>אודס</th><th>טרנד</th></tr></thead>
                 <tbody>
                   {standings.map(s => (
-                    <tr key={s.rank}>
+                    <tr key={s.rank} onClick={()=>openTeamModal(s)} style={{cursor:"pointer"}}>
                       <td><span className={`rbadge rb${s.rank}`}>{s.rank}</span></td>
-                      <td style={{fontWeight:700,fontSize:14}}>{s.team}</td>
+                      <td style={{fontWeight:700,fontSize:14}}>
+                        {s.team}
+                        <span style={{fontSize:10,color:"var(--muted)",marginRight:6}}>🔍</span>
+                      </td>
                       <td><div className="pbar-wrap"><div className="pbar-bg"><div className="pbar-fill" style={{width:`${Math.min(s.prob*4,100)}%`}}/></div><span className="ptext">{s.prob}%</span></div></td>
                       <td style={{fontFamily:"'JetBrains Mono',monospace",fontSize:13,fontWeight:700,color:s.rank===1?"var(--gold2)":"var(--muted)"}}>{s.odds}</td>
                       <td><span className={`trend trend-${s.trend}`}>{s.trend==="up"?"↑":s.trend==="down"?"↓":"→"} {s.note}</span></td>
@@ -745,6 +789,87 @@ export default function Page() {
                 {loadingMore?"⏳ טוען...":"➕ טען עוד המלצות"}
               </button>
               <div className="disc">⚠️ להנאה בין חברים בלבד · לא ייעוץ פיננסי</div>
+            </div>
+          )}
+
+          {/* ── TEAM ANALYSIS MODAL ── */}
+          {teamModal && (
+            <div className="modal-overlay" onClick={(e)=>{if(e.target.classList.contains("modal-overlay")){setTeamModal(null);setTeamModalData(null);}}}>
+              <div className="modal">
+                <div className="modal-handle"/>
+                <div className="modal-header">
+                  <div className="modal-title">{teamModal.team} — ניתוח נבחרת</div>
+                  <button className="modal-close" onClick={()=>{setTeamModal(null);setTeamModalData(null);}}>✕</button>
+                </div>
+
+                <div className="modal-sec">
+                  <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                    <span className={`rbadge rb${teamModal.rank}`}>{teamModal.rank}</span>
+                    <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:14,fontWeight:700,color:"var(--g2)"}}>{teamModal.prob}% סיכוי זכייה</span>
+                    {teamModal.odds && <span className="bodds">אודס: {teamModal.odds}</span>}
+                  </div>
+                </div>
+
+                {teamModalLoading && <div className="modal-loading">🔄 מנתח את הנבחרת...</div>}
+                {teamModalData?.error && <div className="err">{teamModalData.error}</div>}
+
+                {teamModalData && !teamModalData.error && (
+                  <>
+                    <div className="modal-sec">
+                      <div className="modal-sec-title">סקירה כללית</div>
+                      <p className="modal-analysis">{teamModalData.overview}</p>
+                    </div>
+
+                    {teamModalData.strengths?.length > 0 && (
+                      <div className="modal-sec">
+                        <div className="modal-sec-title">💪 חוזקות</div>
+                        <div className="modal-factors">
+                          {teamModalData.strengths.map((s,i)=>(<div key={i} className="modal-factor">{s}</div>))}
+                        </div>
+                      </div>
+                    )}
+
+                    {teamModalData.weaknesses?.length > 0 && (
+                      <div className="modal-sec">
+                        <div className="modal-sec-title">⚠️ חולשות</div>
+                        {teamModalData.weaknesses.map((w,i)=>(
+                          <div key={i} style={{display:"flex",gap:8,fontSize:13,marginBottom:6}}>
+                            <span style={{color:"var(--red)",fontWeight:700}}>✗</span>{w}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {teamModalData.keyPlayers?.length > 0 && (
+                      <div className="modal-sec">
+                        <div className="modal-sec-title">⭐ שחקני מפתח</div>
+                        {teamModalData.keyPlayers.map((p,i)=>(
+                          <div key={i} className="modal-kp" style={{marginBottom:8}}>
+                            <div className="modal-kp-name">{p.name} · {p.position}</div>
+                            <div className="modal-kp-reason">{p.impact}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {teamModalData.tournamentPath && (
+                      <div className="modal-sec">
+                        <div className="modal-sec-title">🛤️ הדרך קדימה</div>
+                        <p className="modal-analysis">{teamModalData.tournamentPath}</p>
+                      </div>
+                    )}
+
+                    {teamModalData.verdict && (
+                      <div className="modal-sec">
+                        <div className="abox">
+                          <div className="alabel">שורה תחתונה</div>
+                          <p className="atext">{teamModalData.verdict}</p>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
           )}
 

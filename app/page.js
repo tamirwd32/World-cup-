@@ -146,6 +146,10 @@ const S = `
   .acc-arrow.open{transform:rotate(180deg);}
   .acc-body{padding:12px;background:#fff;}
 
+  /* Scorers */
+  .scorers-table td{padding:12px 10px;}
+  .scorers-table tr:hover td{background:#f0fdf4;}
+
   /* Bracket */
   .bracket-stage{margin-bottom:20px;}
   .bracket-stage-title{font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1px;color:var(--g1);margin-bottom:10px;text-align:center;}
@@ -460,6 +464,7 @@ export default function Page() {
     { id:"results",  label:"⚽ תוצאות" },
     { id:"schedule", label:"📅 לוח משחקים" },
     { id:"bracket", label:"🏆 מצב הגביע" },
+    { id:"scorers", label:"👟 מלך השערים" },
     { id:"bets",     label:"🎯 הימורים" },
   ];
 
@@ -755,6 +760,42 @@ export default function Page() {
           )}
 
           {/* ── BETS ── */}
+          {tab === "scorers" && (
+            <div className="card">
+              <div className="ctitle">👟 מלך השערים</div>
+              {!fixtures?.scorers?.length ? (
+                <p className="empty">לחץ "עדכן עכשיו" לטעינת טבלת המבקיעים</p>
+              ) : (
+                <table className="wtable scorers-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>שחקן</th>
+                      <th>⚽ שערים</th>
+                      <th>🅰️ בישולים</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {fixtures.scorers.map((s) => (
+                      <tr key={s.pos}>
+                        <td><span className={`rbadge rb${s.pos<=3?s.pos:4}`}>{s.pos}</span></td>
+                        <td>
+                          <div style={{fontWeight:700,fontSize:14}}>{s.name}</div>
+                          <div style={{fontSize:11,color:"var(--muted)"}}>{s.team}</div>
+                        </td>
+                        <td style={{textAlign:"center"}}>
+                          <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:24,color:"var(--g2)"}}>{s.goals}</span>
+                          {s.penalties > 0 && <div style={{fontSize:10,color:"var(--muted)"}}>({s.penalties} פנדל)</div>}
+                        </td>
+                        <td style={{textAlign:"center",fontFamily:"'JetBrains Mono',monospace",fontWeight:700,color:"var(--muted)"}}>{s.assists}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          )}
+
           {tab === "bets" && (
             <div className="card">
               <div className="ctitle">🎯 המלצות הימורים</div>

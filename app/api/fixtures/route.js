@@ -49,11 +49,25 @@ export async function GET() {
   const headers = { "X-Auth-Token": key };
 
   try {
-    const matchesRes = await fetch(`${BASE}/competitions/WC/matches?season=2026`, { headers });
+    const [matchesRes, scorersRes] = await Promise.all([
+      fetch(`${BASE}/competitions/WC/matches?season=2026`, { headers }),
+      fetch(`${BASE}/competitions/WC/scorers?season=2026&limit=20`, { headers }),
+    ]);
     const matchesData = await matchesRes.json();
+    const scorersData = await scorersRes.json();
     if (!matchesRes.ok) throw new Error(matchesData.message || "API error");
 
     const allMatches = matchesData.matches || [];
+
+    // Top scorers
+    const scorers = (scorersData.scorers || []).map((s, i) => ({
+      pos: i + 1,
+      name: s.player?.name || "—",
+      team: ht(s.team?.name || ""),
+      goals: s.goals || 0,
+      assists: s.assists || 0,
+      penalties: s.penalties || 0,
+    }));
     const now = Date.now();
 
     // ── Current stage ──
@@ -187,7 +201,7 @@ export async function GET() {
       });
 
     return Response.json({
-      currentStage, bracket, groups, results, upcoming, schedule,
+      currentStage, bracket, groups, results, upcoming, schedule, scorers,
       finishedCount: results.length,
     }, { headers: { "Cache-Control": "no-store" } });
 
